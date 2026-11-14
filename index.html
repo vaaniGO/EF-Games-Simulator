@@ -1,0 +1,1742 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Play Ehrenfeucht–Fraïssé games and pebble games on graphs: write a first-order or fixed-point sentence, play Spoiler and Duplicator, and see who wins.">
+<title>Spoiler &amp; Duplicator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&family=STIX+Two+Math&display=swap">
+<style>
+/* Layout: a top row with the sentence and the graph controls side by side, then the full-width game table with graph A left and graph B right, then the oracle. Stacks to one column on phones. */
+:root{
+  --paper:#FCFCFA; --card:#FFFFFF; --world:#FAFAF8; --sunk:#F4F4F1;
+  --ink:#1C1C1A; --muted:#5E5E58; --faint:#94938C; --line:#E2E1DB; --line2:#ECEBE6;
+  --gridline:rgba(60,60,60,.06);
+  --spoiler:#DA4A30; --spoiler-ink:#B23620; --spoiler-soft:#FCE3DC;
+  --dup:#2A5ECF; --dup-ink:#1E48A6; --dup-soft:#DDE6FA;
+  --good:#17855A; --good-soft:#DCF2E7; --bad:#CF3229; --bad-soft:#FBDFDC;
+  --p1:#DE960B; --p2:#8952E6; --p3:#14976A; --p4:#D63F88; --p5:#1690C6;
+  --on-accent:#FFFFFF;
+  --shadow:0 1px 2px rgba(30,30,28,.05),0 8px 24px rgba(30,30,28,.05);
+  --f-display:"EB Garamond","STIX Two Math",Garamond,Georgia,serif;
+  --f-body:"EB Garamond","STIX Two Math",Garamond,Georgia,serif;
+  --f-mono:"EB Garamond","STIX Two Math","Cambria Math",Garamond,serif;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --paper:#141413; --card:#1C1C1B; --world:#222220; --sunk:#181817; --gridline:rgba(255,255,255,.05);
+    --ink:#ECEBE6; --muted:#A9A8A0; --faint:#75746D; --line:#34332F; --line2:#292826;
+    --spoiler:#FF6A50; --spoiler-ink:#FF8E7A; --spoiler-soft:#3B201C;
+    --dup:#5D91FF; --dup-ink:#8DB1FF; --dup-soft:#1B2747;
+    --good:#3CC78A; --good-soft:#14302A; --bad:#FF5B52; --bad-soft:#3B1B1C;
+    --p1:#F4B331; --p2:#A77DFF; --p3:#30C48C; --p4:#F064A8; --p5:#3DB5EC;
+    --on-accent:#FFFFFF;
+    --shadow:0 1px 2px rgba(0,0,0,.35),0 10px 30px rgba(0,0,0,.3);
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#141413; --card:#1C1C1B; --world:#222220; --sunk:#181817; --gridline:rgba(255,255,255,.05);
+  --ink:#ECEBE6; --muted:#A9A8A0; --faint:#75746D; --line:#34332F; --line2:#292826;
+  --spoiler:#FF6A50; --spoiler-ink:#FF8E7A; --spoiler-soft:#3B201C;
+  --dup:#5D91FF; --dup-ink:#8DB1FF; --dup-soft:#1B2747;
+  --good:#3CC78A; --good-soft:#14302A; --bad:#FF5B52; --bad-soft:#3B1B1C;
+  --p1:#F4B331; --p2:#A77DFF; --p3:#30C48C; --p4:#F064A8; --p5:#3DB5EC;
+  --on-accent:#FFFFFF;
+  --shadow:0 1px 2px rgba(0,0,0,.35),0 10px 30px rgba(0,0,0,.3);
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{background:var(--paper);color:var(--ink);font-family:var(--f-body);font-size:17px;line-height:1.5;-webkit-font-smoothing:antialiased}
+button,select,textarea,input{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2.5px solid var(--dup);outline-offset:2px;border-radius:6px}
+.app{max-width:1560px;margin:0 auto;padding-block:20px 48px;padding-left:max(clamp(16px,7vw,120px),env(safe-area-inset-left,0px));padding-right:max(clamp(16px,7vw,120px),env(safe-area-inset-right,0px))}
+
+/* ---------- header ---------- */
+.top{margin-bottom:40px}
+.navbar{display:flex;align-items:center;justify-content:space-between;gap:12px 20px;flex-wrap:wrap;padding-bottom:12px;border-bottom:1px solid var(--line)}
+.navbar .modes{padding:3px;border-radius:12px}
+.navbar .mode{padding:7px 14px;border-radius:9px}
+.navbar .mode-s{display:none}
+.navbar .ghost{padding:8px 13px}
+.brand{flex:1 1 420px;min-width:0}
+.top-right{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.mark{width:52px;height:36px;flex:none}
+.mark .m1{fill:var(--spoiler)} .mark .m2{fill:var(--dup);mix-blend-mode:multiply}
+h1{font-family:var(--f-display);font-weight:700;font-size:22px;letter-spacing:-.01em;line-height:1.1;margin:0}
+h1 .amp{color:var(--faint);font-weight:500}
+h1 .s{color:var(--spoiler)} h1 .d{color:var(--dup)}
+.tag{margin:12px 0 0;color:var(--muted);font-size:13.5px;max-width:78ch;line-height:1.5}
+.tag a{color:var(--dup-ink);font-weight:700;text-underline-offset:3px;white-space:nowrap}
+.modes{display:flex;background:var(--sunk);border:1px solid var(--line);border-radius:14px;padding:4px;gap:4px;flex-wrap:wrap}
+.mode{display:flex;flex-direction:column;align-items:flex-start;text-align:left;border:0;background:transparent;border-radius:10px;padding:8px 14px;min-width:0}
+.mode-t{font-family:var(--f-display);font-weight:700;font-size:15px}
+.mode-s{font-size:12px;color:var(--muted)}
+.mode[aria-selected="true"]{background:var(--card);box-shadow:var(--shadow)}
+.mode[aria-selected="true"] .mode-t{color:var(--ink)}
+.mode:not([aria-selected="true"]) .mode-t{color:var(--muted)}
+.ghost{border:1px solid var(--line);background:var(--card);border-radius:10px;padding:9px 14px;font-weight:700}
+.ghost:hover{border-color:var(--faint)}
+
+/* ---------- layout ---------- */
+.layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.3fr);grid-template-areas:"sent setup" "table table" "oracle oracle";gap:44px 20px;align-items:stretch}
+.setup{display:flex;flex-wrap:wrap;gap:8px 26px;align-content:flex-start}
+.setup>.field{flex:0 0 auto}
+.setup>.gfield{flex:1 1 260px;min-width:0}
+.players .seg{flex-wrap:nowrap}
+.setup>.card-h{flex:1 0 100%}
+.setup>.card-h{margin-bottom:0}
+.setup>.field{margin-top:0}
+.oracle{align-self:start}
+.sentence{grid-area:sent}.setup{grid-area:setup}.oracle{grid-area:oracle}.table{grid-area:table}
+@media (max-width:860px){.layout{grid-template-columns:minmax(0,1fr);grid-template-areas:"sent" "setup" "table" "oracle"}}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 14px;min-width:0}
+.card-h{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:8px}
+h2{font-family:var(--f-display);font-weight:700;font-size:17px;margin:0;letter-spacing:-.01em}
+.sub{font-size:12.5px;color:var(--muted)}
+.eyebrow{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--faint);font-weight:700}
+
+/* ---------- sentence ---------- */
+.fx-wrap{position:relative}
+#fx{width:100%;resize:none;border:1.5px solid var(--line);background:var(--sunk);border-radius:12px;padding:8px 12px;font-family:var(--f-mono);font-size:16px;line-height:1.5;min-height:42px;outline:none;transition:border-color .15s}
+#fx:focus{border-color:var(--dup);background:var(--card)}
+#fx.bad{border-color:var(--bad)}
+.palette{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
+.palette button{border:1px solid var(--line);background:var(--card);border-radius:8px;min-width:30px;height:28px;padding:0 7px;font-family:var(--f-mono);font-size:14px;line-height:1}
+.palette button:hover{border-color:var(--dup);color:var(--dup-ink)}
+.palette .wide{font-size:12.5px}
+.examples{margin-top:8px;display:flex;flex-direction:column;gap:4px}
+.examples summary{cursor:pointer;font-size:13px;color:var(--muted);font-weight:700;list-style:none}
+.examples summary::-webkit-details-marker{display:none}
+.examples summary::before{content:"▸ ";color:var(--faint)}
+.examples[open] summary::before{content:"▾ "}
+.ex-list{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.ex{border:1px dashed var(--line);background:transparent;border-radius:999px;padding:4px 11px;font-size:13px;color:var(--ink);text-align:left}
+.ex:hover{border-style:solid;border-color:var(--dup);background:var(--dup-soft)}
+.ex.suggest{border-style:solid;border-color:var(--spoiler);color:var(--spoiler-ink)}
+.status{margin-top:12px;font-size:13.5px}
+.err{background:var(--bad-soft);border-radius:10px;padding:10px 12px;color:var(--ink)}
+.err b{color:var(--bad)}
+.snip{display:block;margin-top:6px;font-family:var(--f-mono);font-size:13px;white-space:pre-wrap;word-break:break-word;color:var(--muted)}
+.snip mark{background:transparent;color:var(--bad);text-decoration:underline wavy var(--bad);text-underline-offset:3px;font-weight:600}
+.snip mark:empty::after{content:"_";}
+.err .switch{margin-top:8px;border:0;background:var(--ink);color:var(--card);border-radius:8px;padding:6px 10px;font-weight:700;font-size:13px}
+.reading{margin-top:12px;border-top:1px solid var(--line2);padding-top:12px}
+.pretty{font-family:var(--f-mono);font-size:14.5px;line-height:1.9;word-break:break-word}
+.pretty .v{font-style:italic;color:var(--dup-ink)}
+.pretty .op{color:var(--muted)}
+.pretty .q{color:var(--spoiler-ink);font-weight:600}
+.pretty .rel{font-weight:600}
+.pretty .rel.fix{color:var(--p2)}
+.pretty .kw{font-weight:600;color:var(--p2)}
+.pretty .par{color:var(--faint)}
+.pretty .f.hl{background:var(--spoiler-soft);box-shadow:0 0 0 2px var(--spoiler-soft);border-radius:4px;outline:1.5px solid var(--spoiler);outline-offset:1px}
+.english{margin:8px 0 0;color:var(--muted);font-size:14px}
+.english::first-letter{text-transform:uppercase}
+.english i{color:var(--ink)}
+.facts{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}
+.fact{display:inline-flex;align-items:baseline;gap:6px;background:var(--sunk);border-radius:8px;padding:5px 10px;font-size:13px}
+.fact b{font-family:var(--f-display);font-size:16px}
+.truth{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+.tv{display:flex;align-items:center;gap:10px;border-radius:10px;padding:4px 10px;border:1.5px solid var(--line)}
+.tv .ent{font-family:var(--f-mono);font-weight:600;font-size:17px;line-height:1.2}
+.tv .t{font-weight:700;font-size:14px}
+.tv{justify-content:center}.tv.yes{border-color:var(--good);background:var(--good-soft)} .tv.yes .ent{color:var(--good)}
+.tv.no{border-color:var(--line);background:var(--sunk)} .tv.no .ent{color:var(--muted)}
+.verdict{margin:12px 0 0;font-size:14px}
+.verdict strong{font-weight:700}
+.plan{margin-top:12px;border-radius:12px;padding:10px 12px;background:var(--sunk);font-size:13.5px;display:flex;gap:10px;align-items:flex-start}
+.plan .av{width:24px;height:24px;flex:none;margin-top:1px}
+.plan.off{opacity:.8}
+.plan .plan-t{min-width:0}
+.plan .plan-h{font-weight:700;display:block;margin-bottom:2px}
+
+/* ---------- setup ---------- */
+.field{display:flex;flex-direction:column;gap:4px;margin-top:10px}
+.field:first-of-type{margin-top:0}
+.gpick{display:flex;align-items:center;gap:8px}.gpick+.gpick{margin-top:4px}.gpick select{padding:5px 8px}.gpick .gl{font-family:var(--f-display);font-weight:800;font-size:18px;width:16px}.gpick select{flex:1;min-width:0}.gpick .nl{font-style:italic;font-weight:700;color:var(--muted)}
+.field>label,.field>.lbl{font-size:12.5px;font-weight:700;color:var(--muted)}
+select{border:1.5px solid var(--line);background:var(--sunk);border-radius:10px;padding:9px 10px;width:100%}
+.row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.stepper{display:inline-flex;align-items:center;border:1.5px solid var(--line);border-radius:10px;overflow:hidden;background:var(--sunk)}
+.stepper button{border:0;background:transparent;width:30px;height:30px;font-size:18px;line-height:1}
+.stepper button:hover{background:var(--line2)}
+.stepper button:disabled{opacity:.35;cursor:default}
+.stepper output{min-width:32px;text-align:center;font-family:var(--f-display);font-weight:700;font-size:17px;font-variant-numeric:tabular-nums}
+.linkbtn{border:0;background:none;color:var(--dup-ink);font-weight:700;font-size:13px;padding:2px;text-decoration:underline;text-underline-offset:3px}
+.note{font-size:12.5px;color:var(--muted)}
+.note.warn{color:var(--spoiler-ink)}
+.players{display:grid;grid-template-columns:auto 1fr;gap:4px 10px;align-items:center}
+.players .seg{justify-self:start}
+.pl-name{display:flex;align-items:center;gap:8px;font-weight:700;font-size:14px}
+.pl-name .av{width:22px;height:22px}
+.seg{display:inline-flex;background:var(--sunk);border:1px solid var(--line);border-radius:10px;padding:3px;gap:2px;flex-wrap:wrap}
+.seg button{border:0;background:transparent;border-radius:7px;padding:3px 10px;font-size:13px;font-weight:700;color:var(--muted)}
+.seg button[aria-pressed="true"]{background:var(--card);color:var(--ink);box-shadow:var(--shadow)}
+.btn{border:1.5px solid var(--line);background:var(--card);border-radius:10px;padding:8px 13px;font-weight:700;font-size:14px;display:inline-flex;align-items:center;gap:7px}
+.btn:hover{border-color:var(--faint)}
+.btn:disabled{opacity:.4;cursor:default}
+.btn.primary{background:var(--ink);border-color:var(--ink);color:var(--card)}
+.btn.small{padding:6px 10px;font-size:13px}
+.btn svg{width:16px;height:16px}
+
+/* ---------- oracle ---------- */
+.switch-row{display:flex;align-items:center;gap:10px}
+.toggle{position:relative;width:42px;height:24px;border-radius:999px;border:0;background:var(--line);flex:none;transition:background .2s}
+.toggle::after{content:"";position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:var(--card);box-shadow:0 1px 2px rgba(0,0,0,.25);transition:transform .2s}
+.toggle[aria-checked="true"]{background:var(--ink)}
+.toggle[aria-checked="true"]::after{transform:translateX(18px)}
+.rope{margin-top:14px;position:relative;height:34px}
+.rope-line{position:absolute;left:0;right:0;top:15px;height:4px;border-radius:2px;background:linear-gradient(90deg,var(--spoiler) 0%,var(--spoiler) 50%,var(--dup) 50%,var(--dup) 100%);opacity:.35}
+.rope-knot{position:absolute;top:6px;width:22px;height:22px;margin-left:-11px;border-radius:50%;background:var(--card);border:3px solid var(--ink);transition:left .6s cubic-bezier(.3,1.4,.5,1)}
+.rope-ends{display:flex;justify-content:space-between;font-size:12px;font-weight:700}
+.rope-ends .s{color:var(--spoiler-ink)} .rope-ends .d{color:var(--dup-ink)}
+.oracle-text{margin:8px 0 0;font-size:14px}
+.oracle-off{margin:10px 0 0;font-size:13.5px;color:var(--muted)}
+
+/* ---------- table ---------- */
+.table{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:14px;box-shadow:var(--shadow);min-width:0}
+.turnbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:4px 4px 12px}
+.turn-av{width:42px;height:42px;flex:none;transition:transform .3s}
+.turn-av.bounce{animation:bob 1.6s ease-in-out infinite}
+@keyframes bob{50%{transform:translateY(-3px)}}
+.turn-text{min-width:0;flex:1 1 220px}
+.turn-title{font-family:var(--f-display);font-weight:800;font-size:20px;line-height:1.15;letter-spacing:-.01em}
+.turn-title.s{color:var(--spoiler-ink)} .turn-title.d{color:var(--dup-ink)}
+.turn-sub{font-size:14px;color:var(--muted)}
+.tracker{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--muted);font-weight:700}
+.dots{display:flex;gap:5px}
+.dot{width:12px;height:12px;border-radius:50%;border:2px solid var(--line)}
+.dot.done{background:var(--ink);border-color:var(--ink)}
+.dot.now{border-color:var(--ink)}
+.dot.lost{background:var(--spoiler);border-color:var(--spoiler)}
+.turn-actions{display:flex;gap:6px;flex-wrap:wrap}
+.tray{display:flex;flex-wrap:wrap;gap:8px;padding:0 4px 12px;align-items:center}
+.tray-label{font-size:12.5px;font-weight:700;color:var(--muted);margin-right:2px}
+.pp{display:flex;align-items:center;gap:8px;border:1.5px solid var(--line);background:var(--card);border-radius:12px;padding:6px 10px 6px 7px;touch-action:none;user-select:none;-webkit-user-select:none}
+.pp .twins{display:flex}
+.pp .tw{width:20px;height:20px;border-radius:50%;background:var(--c);color:var(--on-accent);font-size:11px;font-weight:700;display:grid;place-items:center;border:2px solid var(--card)}
+.pp .tw+.tw{margin-left:-7px}
+.pp .pp-t{font-size:12.5px;line-height:1.2;text-align:left}
+.pp .pp-t b{display:block;font-size:13px}
+.pp .pp-t span{color:var(--muted)}
+.pp.sel{border-color:var(--ink);box-shadow:0 0 0 3px var(--line2)}
+.pp.due{border-color:var(--dup);box-shadow:0 0 0 3px var(--dup-soft)}
+.pp.hinted{animation:pulseBox 1.1s ease-in-out infinite}
+.pp:disabled{cursor:default}
+@keyframes pulseBox{50%{box-shadow:0 0 0 6px var(--spoiler-soft)}}
+.board-wrap{position:relative;border-radius:16px;overflow:hidden}
+#board{display:block;width:100%;user-select:none;-webkit-user-select:none}
+#board.editing{touch-action:none}
+.legend{display:flex;flex-wrap:wrap;gap:14px;font-size:12px;color:var(--muted);padding:10px 4px 0}
+.legend i{display:inline-block;width:11px;height:11px;border-radius:50%;vertical-align:-1px;margin-right:5px}
+.log-wrap{margin-top:10px;border-top:1px solid var(--line2);padding:10px 4px 0}
+.log{display:flex;gap:6px;flex-wrap:wrap;list-style:none;margin:0;padding:0}
+.log .empty{color:var(--faint);font-size:13px}
+.mv{display:flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:10px;padding:4px 9px;font-size:13px;font-variant-numeric:tabular-nums;background:var(--card);cursor:default}
+.mv:hover{border-color:var(--faint)}
+.mv-n{font-family:var(--f-display);font-weight:800;font-size:12px;color:var(--faint)}
+.mv-s{color:var(--spoiler-ink);font-weight:700}
+.mv-d{color:var(--dup-ink);font-weight:700}
+.mv .pd{width:12px;height:12px;border-radius:50%;background:var(--c)}
+.mv .slip{font-size:11px;font-weight:700;border-radius:6px;padding:1px 6px;background:var(--bad-soft);color:var(--bad)}
+.mv.end{border-color:var(--bad);background:var(--bad-soft)}
+
+/* svg */
+.world{fill:var(--world);stroke:var(--line);stroke-width:1}
+.world.editing{stroke:var(--dup);stroke-dasharray:6 5}
+.world.target{stroke:var(--dup);stroke-width:2}
+.world.source{opacity:.75}
+.gdot{fill:var(--line)}
+.wl{font-family:var(--f-display);font-weight:800;font-size:30px;fill:var(--ink)}
+.wn{font-family:var(--f-body);font-size:13px;fill:var(--muted)}
+.tvl{font-family:var(--f-mono);font-size:18px;font-weight:600;text-anchor:end}.tvl.yes{fill:var(--good)}.tvl.no{fill:var(--muted)}
+.chip rect{rx:9px}
+.chip.yes rect{fill:var(--good-soft);stroke:var(--good)}
+.chip.yes text{fill:var(--good)}
+.chip.no rect{fill:var(--sunk);stroke:var(--line)}
+.chip.no text{fill:var(--muted)}
+.chip text{font-family:var(--f-body);font-size:12px;font-weight:700}
+.edge{stroke:var(--muted);stroke-width:2.2;fill:none;stroke-linecap:round}
+.edge.directed{stroke-width:2}
+.edge-hit{stroke:transparent;stroke-width:16;fill:none;cursor:pointer}
+.edge-hit:hover+.edge{stroke:var(--bad);stroke-dasharray:6 5}
+.clearchip{cursor:pointer}.clearchip:hover rect{stroke:var(--bad)}.clearchip:hover text{fill:var(--bad)}
+#ghostnode{fill:none;stroke:var(--dup);stroke-width:2;stroke-dasharray:4 4;pointer-events:none}
+.baseline{stroke:var(--line);stroke-width:3;stroke-linecap:round}
+.basecap{font-size:11.5px;fill:var(--faint);font-family:var(--f-body)}
+.arrowhead{fill:var(--muted)} .arrowhead.bad{fill:var(--bad)} .arrowhead.faint{fill:var(--faint)}
+.node .halo{fill:transparent;transition:fill .15s}
+.node .bd{fill:var(--card);stroke:var(--ink);stroke-width:2;transition:stroke .15s,fill .15s}
+.node text{font-family:var(--f-body);font-size:12.5px;font-weight:700;fill:var(--ink);text-anchor:middle;pointer-events:none}
+.node.can{cursor:pointer}
+.node.can-s:hover .halo{fill:var(--spoiler-soft)}
+.node.can-s:hover .bd{stroke:var(--spoiler);fill:var(--spoiler-soft)}
+.node.can-d:hover .halo{fill:var(--dup-soft)}
+.node.can-d:hover .bd{stroke:var(--dup);fill:var(--dup-soft)}
+.node.can-d .bd{stroke:var(--dup)}
+.node.edit{cursor:grab}
+.node.edit:hover .bd{stroke:var(--dup)}
+.node.erase:hover .bd{stroke:var(--bad);fill:var(--bad-soft)}
+.node.linksrc .bd{stroke:var(--dup);stroke-width:3}
+.node.dim{opacity:.45}
+.node.focus .halo{fill:var(--line2)}
+.node.bad .bd{stroke:var(--bad);stroke-width:3}
+.node.bad .halo{fill:var(--bad-soft)}
+.node.pend .bd{stroke:var(--spoiler);stroke-width:3}
+.hint-ring{fill:none;stroke-width:3;animation:ring 1.2s ease-out infinite;transform-box:fill-box;transform-origin:center}
+.hint-ring.s{stroke:var(--spoiler)} .hint-ring.d{stroke:var(--dup)}
+@keyframes ring{0%{opacity:.9;transform:scale(.85)}100%{opacity:0;transform:scale(1.5)}}
+.thread{fill:none;stroke:var(--c);stroke-width:2.4;opacity:.6;stroke-linecap:round}
+.thread.fresh{stroke-dasharray:1200;stroke-dashoffset:1200;animation:draw .7s ease-out forwards}
+@keyframes draw{to{stroke-dashoffset:0}}
+.thread.bad{stroke:var(--bad);opacity:.95;stroke-width:3}
+.thread.hov{opacity:1;stroke-width:3.4}
+.tmid circle{fill:var(--card);stroke:var(--c);stroke-width:2}
+.tmid text{font-family:var(--f-display);font-weight:800;font-size:11px;fill:var(--ink);text-anchor:middle}
+#rubber{fill:none;stroke:var(--spoiler);stroke-width:2.4;stroke-dasharray:5 6;opacity:.85;pointer-events:none}
+#linkline{stroke:var(--dup);stroke-width:2.4;stroke-dasharray:4 5;pointer-events:none}
+.tok circle{stroke:var(--card);stroke-width:2}
+.tok.s circle.ring{fill:none;stroke:var(--spoiler);stroke-width:2.2}
+.tok.d circle.ring{fill:none;stroke:var(--dup);stroke-width:2.2}
+.tok text{font-family:var(--f-body);font-weight:700;font-size:10.5px;fill:var(--on-accent);text-anchor:middle;pointer-events:none}
+.tok.badge.s circle.fillc{fill:var(--spoiler)} .tok.badge.d circle.fillc{fill:var(--dup)}
+.tok.grab{cursor:grab}
+.tok.pending{animation:hop .9s ease-in-out infinite}
+@keyframes hop{50%{transform:translateY(-3px)}}
+.vio{stroke:var(--bad);stroke-width:3.2;fill:none;stroke-linecap:round}
+.vio.ghost{stroke-dasharray:3 7;stroke-width:3}
+.vio-x{font-family:var(--f-body);font-weight:700;font-size:12px;fill:var(--bad);text-anchor:middle}
+.vio-tag rect{fill:var(--bad);rx:7px}
+.vio-tag text{fill:var(--on-accent);font-family:var(--f-body);font-weight:700;font-size:11px;text-anchor:middle}
+.seam{stroke:var(--line);stroke-width:1;stroke-dasharray:2 6}
+
+/* edit tools */
+.tools{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:0 4px 10px}
+.tools .sp{flex:1}
+.tools-help{font-size:13px;color:var(--muted);margin:0 4px 10px}
+.count{font-size:13px;font-weight:700;color:var(--muted)}
+
+/* result */
+.result{margin-top:12px;background:var(--sunk);border-radius:14px;padding:12px 16px;animation:rise .35s ease-out}
+.result h3{margin:0;font-family:var(--f-display);font-weight:800;font-size:19px;letter-spacing:-.01em}
+.result.sw h3{color:var(--spoiler-ink)} .result.dw h3{color:var(--dup-ink)}
+.result.sw{background:var(--spoiler-soft)} .result.dw{background:var(--dup-soft)}
+@keyframes rise{from{transform:translateY(10px);opacity:0}}
+.stamp{flex:none;width:108px;height:108px;border-radius:50%;display:grid;place-items:center;text-align:center;font-family:var(--f-display);font-weight:800;text-transform:uppercase;letter-spacing:.04em;font-size:15px;line-height:1.05;border:4px double currentColor;transform:rotate(-9deg);animation:stamp .55s cubic-bezier(.2,1.5,.4,1) both}
+.stamp small{display:block;font-size:22px;letter-spacing:.02em}
+.stamp.s{color:var(--spoiler)} .stamp.d{color:var(--dup)}
+@keyframes stamp{0%{transform:scale(2.1) rotate(-20deg);opacity:0}60%{transform:scale(.93) rotate(-8deg);opacity:1}100%{transform:scale(1) rotate(-9deg)}}
+.result-text{min-width:0}
+.result-text h3{margin:0;font-family:var(--f-display);font-size:19px;font-weight:800;letter-spacing:-.01em}
+.result-text p{margin:4px 0 0;font-size:13.5px}
+.result-text .perfect{color:var(--muted)}
+.result-actions{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap}
+.result.mini{padding:8px 10px;gap:10px;width:auto;left:auto;right:12px;transform:none;animation:none}
+.result.mini .stamp{width:54px;height:54px;font-size:8px;border-width:3px;animation:none}
+.result.mini .stamp small{font-size:11px}
+.result.mini .result-text p,.result.mini .result-actions .hide{display:none}
+.result.mini .result-text h3{font-size:15px}
+.result.mini .result-actions{margin-top:4px}
+@media (max-width:560px){.result{flex-direction:column;align-items:flex-start;gap:8px}.stamp{width:80px;height:80px;font-size:11px}.stamp small{font-size:16px}}
+.toast{position:absolute;top:12px;left:50%;transform:translateX(-50%);background:var(--ink);color:var(--card);border-radius:10px;padding:8px 14px;font-size:13.5px;font-weight:700;opacity:0;pointer-events:none;transition:opacity .2s;max-width:calc(100% - 24px);text-align:center}
+.toast.on{opacity:1}
+.ghostpeb{position:fixed;z-index:50;width:28px;height:28px;margin:-14px 0 0 -14px;border-radius:50%;background:var(--c);border:3px solid var(--card);box-shadow:0 6px 16px rgba(0,0,0,.25);pointer-events:none;color:var(--on-accent);font-weight:700;font-size:12px;display:grid;place-items:center}
+
+/* rules sheet */
+.sheet-bg{position:fixed;inset:0;background:rgba(10,12,20,.45);z-index:40;display:grid;place-items:center;padding:16px}
+.sheet{background:var(--card);border-radius:20px;max-width:720px;width:100%;max-height:calc(100vh - 32px);overflow:auto;padding:22px 24px;box-shadow:var(--shadow)}
+.sheet h2{font-size:22px}
+.sheet h3{font-family:var(--f-display);font-size:16px;margin:18px 0 6px}
+.sheet ol{padding-left:20px;margin:6px 0}
+.sheet li{margin:4px 0}
+.sheet p{margin:6px 0;max-width:65ch}
+.syn{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;font-size:14px;margin-top:6px}
+.syn code{font-family:var(--f-mono);font-size:13.5px;background:var(--sunk);border-radius:6px;padding:1px 6px;white-space:nowrap}
+.sheet-close{float:right}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.001s!important;animation-iteration-count:1!important;transition-duration:.001s!important}}
+</style>
+<style>
+html{-webkit-text-size-adjust:100%}
+:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+body{margin:0}
+img{max-width:100%}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <header class="top">
+    <nav class="navbar" aria-label="Games">
+      <h1 id="pageH">EF Game</h1>
+      <div class="top-right">
+        <div class="modes" role="tablist" aria-label="Game">
+      <button class="mode" role="tab" id="mode-ef" data-mode="ef"><span class="mode-t">Ehrenfeucht–Fraïssé game</span><span class="mode-s">First-order logic · a set number of rounds</span></button>
+      <button class="mode" role="tab" id="mode-pebble" data-mode="pebble"><span class="mode-t">Pebble game</span><span class="mode-s">Fixed-point logic · a set number of pebbles</span></button>
+    </div>
+        <button class="ghost" id="rulesBtn">How to play</button>
+      </div>
+    </nav>
+    <p class="tag">If A and B are n-equivalent for every n, no first-order sentence is true in one and false in the other. A winning strategy for Spoiler in EF<sub>n</sub>(A, B) converts into a first-order sentence, with quantifiers nested at most n deep, that is true in exactly one of them. These games give a necessary and sufficient condition for elementary equivalence. <a href="https://pi.math.cornell.edu/~mec/Summer2009/Raluca/lesson1.html" target="_blank" rel="noopener">Read more</a></p>
+  </header>
+
+  <main class="layout">
+    <section class="card sentence" aria-labelledby="sentH">
+      <div class="card-h"><h2 id="sentH">The sentence φ</h2><span class="sub">What do you want to check?</span></div>
+      <div class="fx-wrap"><textarea id="fx" rows="1" spellcheck="false" autocomplete="off" autocapitalize="off" aria-label="Sentence to check"></textarea></div>
+      <div class="palette" id="palette" aria-label="Insert a symbol"></div>
+      <div class="status" id="fxStatus" aria-live="polite"></div>
+      <div id="fxOk">
+      </div>
+      <details class="examples" id="examples"><summary>Example sentences</summary><div class="ex-list" id="exList"></div></details>
+    </section>
+
+    <section class="card setup" aria-labelledby="setH">
+      <div class="card-h"><h2 id="setH">Graphs &amp; rules</h2></div>
+      <div class="field gfield"><span class="lbl">Graphs</span><div id="gpick"></div></div>
+      <div class="field"><span class="lbl">Who plays</span>
+        <div class="players">
+          <span class="pl-name">Spoiler</span><div class="seg" id="plS"><button data-v="human">You</button><button data-v="cpu">Computer</button></div>
+          <span class="pl-name">Duplicator</span><div class="seg" id="plD"><button data-v="human">You</button><button data-v="cpu">Computer</button></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="table" id="table" aria-label="Game table">
+      <div class="turnbar" id="turnbar"></div>
+      <div id="editTools" hidden></div>
+      <div class="tray" id="tray" hidden></div>
+      <div class="board-wrap" id="boardWrap">
+        <svg id="board" role="application" aria-label="The two graphs"></svg>
+        <div class="toast" id="toast" role="status"></div>
+      </div>
+      <div class="result" id="result" hidden aria-live="polite"></div>
+      <div class="legend" id="legend"></div>
+      <div class="log-wrap" id="logWrap"><ol class="log" id="log" aria-label="The map f, round by round"></ol></div>
+    </section>
+
+
+    <section class="card oracle" aria-labelledby="orH">
+      <div class="card-h"><h2 id="orH">Perfect-play oracle</h2>
+        <div class="switch-row"><span class="sub">Show</span><button class="toggle" id="orToggle" role="switch" aria-checked="false" aria-label="Show the oracle"></button></div>
+      </div>
+      <div id="oracleBody"></div>
+    </section>
+  </main>
+</div>
+<div class="sheet-bg" id="rules" hidden><div class="sheet" role="dialog" aria-modal="true" aria-labelledby="rulesH" id="rulesSheet"></div></div>
+
+<script>
+'use strict';
+/* =====================================================================
+   Logic: tokenizer, parser, checks, evaluator, printers
+   ===================================================================== */
+class FErr extends Error{constructor(msg,s,e,code){super(msg);this.s=s;this.e=e;this.code=code;}}
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const other=s=>s==='A'?'B':'A';
+const SIDES=['A','B'];
+const MAXN=10;
+const PEB=[{name:'amber',c:'var(--p1)'},{name:'violet',c:'var(--p2)'},{name:'green',c:'var(--p3)'},{name:'rose',c:'var(--p4)'},{name:'sky',c:'var(--p5)'}];
+
+function tokenize(src){
+  const T=[];let i=0;const n=src.length;
+  const single={'(':'lp',')':'rp','[':'lb',']':'rb',',':'comma','.':'dot',':':'colon','¬':'not','~':'not','!':'not','∧':'and','&':'and','∨':'or','|':'or','→':'imp','⇒':'imp','↔':'iff','⇔':'iff','=':'eq','≠':'neq','<':'lt','>':'gt','∃':'exists','∀':'forall','⊤':'true','⊥':'false','μ':'lfp'};
+  const multi=[['<->','iff'],['<=>','iff'],['->','imp'],['=>','imp'],['!=','neq'],['/=','neq'],['&&','and'],['||','or'],['/\\','and'],['\\/','or'],['==','eq']];
+  const words={exists:'exists',forall:'forall',and:'and',or:'or',not:'not',implies:'imp',iff:'iff',true:'true',false:'false',lfp:'lfp'};
+  while(i<n){
+    const c=src[i];
+    if(/\s/.test(c)){i++;continue;}
+    const m=multi.find(([s])=>src.startsWith(s,i));
+    if(m){T.push({t:m[1],s:i,e:i+m[0].length});i+=m[0].length;continue;}
+    if(single[c]){T.push({t:single[c],s:i,e:i+1});i++;continue;}
+    if(/[A-Za-z_]/.test(c)){
+      let j=i+1;while(j<n&&/[A-Za-z0-9_'’₀-₉]/.test(src[j]))j++;
+      const w=src.slice(i,j),lw=w.toLowerCase();
+      if(words[lw])T.push({t:words[lw],s:i,e:j});
+      else if(/[A-Z]/.test(w[0]))T.push({t:'rel',v:w,s:i,e:j});
+      else T.push({t:'var',v:w,s:i,e:j});
+      i=j;continue;
+    }
+    throw new FErr(`I don't recognise the symbol “${c}”.`,i,i+1);
+  }
+  T.push({t:'eof',s:n,e:n});
+  return T;
+}
+
+let NID=0;
+function mk(k,s,e,props){return Object.assign({k,id:++NID,s,e},props);}
+
+function parse(src){
+  NID=0;
+  const T=tokenize(src);let p=0;
+  const peek=()=>T[p],next=()=>T[p++],at=t=>T[p].t===t;
+  const txt=t=>t.t==='eof'?'the end':src.slice(t.s,t.e);
+  const fail=(msg,t)=>{throw new FErr(msg,t.s,Math.max(t.e,t.s+1));};
+  const expect=(t,msg)=>{if(T[p].t!==t)fail(msg,T[p]);return T[p++];};
+  function formula(){return iff();}
+  function iff(){let l=imp();while(at('iff')){next();const r=imp();l=mk('iff',l.s,r.e,{a:l,b:r});}return l;}
+  function imp(){const l=or();if(at('imp')){next();const r=imp();return mk('imp',l.s,r.e,{a:l,b:r});}return l;}
+  function or(){let l=and();while(at('or')){next();const r=and();l=mk('or',l.s,r.e,{a:l,b:r});}return l;}
+  function and(){let l=unary();while(at('and')){next();const r=unary();l=mk('and',l.s,r.e,{a:l,b:r});}return l;}
+  function varsInParens(){const vs=[];for(;;){vs.push(expect('var','Put a variable name here, like x.'));if(at('comma')){next();continue;}break;}expect('rp','Close the brackets with “)”.');return vs;}
+  function unary(){
+    const t=peek();
+    switch(t.t){
+      case 'not':{next();const a=unary();return mk('not',t.s,a.e,{a});}
+      case 'exists':case 'forall':{
+        next();const sym=t.t==='exists'?'∃':'∀';const vs=[];
+        while(at('var')){vs.push(next());if(at('comma')&&T[p+1].t==='var')next();}
+        if(!vs.length)fail(`After ${sym} write a variable name, for example ${sym}x.`,peek());
+        let body;
+        if(at('dot')||at('colon')){next();body=formula();}
+        else{if(at('eof'))fail(`${sym}${vs[vs.length-1].v} needs something after it.`,peek());body=unary();}
+        for(let i=vs.length-1;i>=0;i--)body=mk(t.t==='exists'?'ex':'all',i===0?t.s:vs[i].s,body.e,{v:vs[i].v,a:body});
+        return body;
+      }
+      case 'lp':{next();const f=formula();if(!at('rp'))fail('This bracket is never closed. Add a matching “)”.',t);next();return f;}
+      case 'lb':{
+        next();
+        if(!at('lfp')){const f=formula();if(!at('rb'))fail('This “[” is never closed.',t);next();return f;}
+        next();
+        const R=expect('rel','After lfp, name the relation you are building with a capital letter, like lfp R(x, y).');
+        if(R.v==='E')fail('E is already the built-in relation. Give the new one another name, like R.',R);
+        expect('lp',`List the variables of ${R.v} in brackets, like ${R.v}(x, y).`);
+        const vars=varsInParens();
+        if(at('colon')||at('dot')||at('comma'))next();
+        const body=formula();
+        if(!at('rb'))fail('Close the fixed point with “]”, then say what to test, like ](x, y).',peek());
+        next();
+        expect('lp','After the closing “]”, say which vertices to test, like (x, y).');
+        const args=varsInParens();
+        return mk('lfp',t.s,T[p-1].e,{R:R.v,vars:vars.map(v=>v.v),body,args:args.map(v=>v.v)});
+      }
+      case 'true':next();return mk('const',t.s,t.e,{val:true});
+      case 'false':next();return mk('const',t.s,t.e,{val:false});
+      case 'rel':{next();if(!at('lp'))fail(`Give ${t.v} its variables in brackets, like ${t.v}(x, y).`,peek());next();const args=varsInParens();return mk('rel',t.s,T[p-1].e,{name:t.v,args:args.map(a=>a.v)});}
+      case 'var':{
+        next();const op=peek();
+        if(['eq','neq','lt','gt'].includes(op.t)){
+          next();const r=expect('var',`Put a variable after “${txt(op)}”.`);
+          if(op.t==='eq')return mk('eq',t.s,r.e,{x:t.v,y:r.v});
+          if(op.t==='neq')return mk('neq',t.s,r.e,{x:t.v,y:r.v});
+          if(op.t==='lt')return mk('rel',t.s,r.e,{name:'E',args:[t.v,r.v]});
+          return mk('rel',t.s,r.e,{name:'E',args:[r.v,t.v]});
+        }
+        fail(`“${t.v}” on its own doesn't say anything. Compare it, like ${t.v} = y, or use it in E(${t.v}, y).`,t);
+      }
+      case 'eof':fail('The sentence stops too early. Something is missing at the end.',t);
+      default:fail(`I didn't expect “${txt(t)}” here.`,t);
+    }
+  }
+  const f=formula();
+  if(!at('eof'))fail(`I didn't expect “${txt(peek())}” here. Is an “and”, “or” or bracket missing?`,peek());
+  return f;
+}
+
+/* core form: not / and / or / ex / all / eq / rel / const / lfp */
+function buildCore(ast){
+  const CORE=[];
+  const C=(k,src,props)=>{const n=Object.assign({k,cid:CORE.length,src},props);CORE.push(n);return n;};
+  function go(n){
+    switch(n.k){
+      case 'imp':return C('or',n.id,{a:C('not',n.a.id,{a:go(n.a)}),b:go(n.b)});
+      case 'iff':return C('or',n.id,{a:C('and',n.id,{a:go(n.a),b:go(n.b)}),b:C('and',n.id,{a:C('not',n.a.id,{a:go(n.a)}),b:C('not',n.b.id,{a:go(n.b)})})});
+      case 'neq':return C('not',n.id,{a:C('eq',n.id,{x:n.x,y:n.y})});
+      case 'not':return C('not',n.id,{a:go(n.a)});
+      case 'and':case 'or':return C(n.k,n.id,{a:go(n.a),b:go(n.b)});
+      case 'ex':case 'all':return C(n.k,n.id,{v:n.v,a:go(n.a)});
+      case 'eq':return C('eq',n.id,{x:n.x,y:n.y});
+      case 'rel':return C('rel',n.id,{name:n.name,args:n.args});
+      case 'const':return C('const',n.id,{val:n.val});
+      case 'lfp':return C('lfp',n.id,{R:n.R,vars:n.vars,body:go(n.body),args:n.args});
+    }
+  }
+  const root=go(ast);
+  function fv(n){
+    let s;
+    switch(n.k){
+      case 'const':s=new Set();break;
+      case 'eq':s=new Set([n.x,n.y]);break;
+      case 'rel':s=new Set(n.args);break;
+      case 'not':s=new Set(fv(n.a));break;
+      case 'and':case 'or':s=new Set([...fv(n.a),...fv(n.b)]);break;
+      case 'ex':case 'all':s=new Set(fv(n.a));s.delete(n.v);break;
+      case 'lfp':{const b=new Set(fv(n.body));n.vars.forEach(v=>b.delete(v));n.params=[...b];s=new Set([...b,...n.args]);break;}
+    }
+    n.fv=[...s];return n.fv;
+  }
+  fv(root);
+  function relsUsed(n,acc){
+    if(n.k==='rel'&&n.name!=='E')acc.add(n.name);
+    if(n.a)relsUsed(n.a,acc);if(n.b)relsUsed(n.b,acc);
+    if(n.k==='lfp'){const inner=new Set();relsUsed(n.body,inner);inner.delete(n.R);n.outer=[...inner];inner.forEach(r=>acc.add(r));}
+    return acc;
+  }
+  relsUsed(root,new Set());
+  return {CORE,root};
+}
+
+function analyseSentence(src,mode){
+  if(!src.trim())return {empty:true};
+  let ast;
+  try{ast=parse(src);}catch(e){if(e instanceof FErr)return {err:e};throw e;}
+  const vars=new Set();let hasLfp=false;const free=[];
+  const flip=r=>{const m=new Map();r.forEach((v,k)=>m.set(k,{arity:v.arity,sign:-v.sign}));return m;};
+  const neutral=r=>{const m=new Map();r.forEach((v,k)=>m.set(k,{arity:v.arity,sign:0}));return m;};
+  const use=(v,n,bound)=>{vars.add(v);if(!bound.has(v))free.push({v,n});};
+  function walk(n,bound,rels){
+    switch(n.k){
+      case 'const':return;
+      case 'not':return walk(n.a,bound,flip(rels));
+      case 'and':case 'or':walk(n.a,bound,rels);walk(n.b,bound,rels);return;
+      case 'imp':walk(n.a,bound,flip(rels));walk(n.b,bound,rels);return;
+      case 'iff':walk(n.a,bound,neutral(rels));walk(n.b,bound,neutral(rels));return;
+      case 'ex':case 'all':vars.add(n.v);walk(n.a,new Set([...bound,n.v]),rels);return;
+      case 'eq':case 'neq':use(n.x,n,bound);use(n.y,n,bound);return;
+      case 'rel':{
+        n.args.forEach(v=>use(v,n,bound));
+        if(n.name==='E'){if(n.args.length!==2)throw new FErr('E links two vertices, so it needs exactly two variables, like E(x, y).',n.s,n.e);return;}
+        const r=rels.get(n.name);
+        if(!r)throw new FErr(`The graphs have one built-in relation, E. “${n.name}” isn't defined here. Build it with [lfp ${n.name}(x, y) : …](x, y) and use it inside.`,n.s,n.e);
+        if(n.args.length!==r.arity)throw new FErr(`${n.name} was set up with ${r.arity} variable${r.arity>1?'s':''}, but is used here with ${n.args.length}.`,n.s,n.e);
+        if(r.sign!==1)throw new FErr(`Inside its own definition, ${n.name} can't sit under “not”, on the left of “→”, or inside “↔”. Otherwise the step-by-step build-up might never settle.`,n.s,n.e);
+        return;
+      }
+      case 'lfp':{
+        hasLfp=true;
+        if(new Set(n.vars).size!==n.vars.length)throw new FErr('The variables listed after lfp must all be different.',n.s,n.e);
+        if(n.args.length!==n.vars.length)throw new FErr(`${n.R}(${n.vars.join(', ')}) has ${n.vars.length} variable${n.vars.length>1?'s':''}, so the test after “]” needs ${n.vars.length} too.`,n.s,n.e);
+        n.args.forEach(v=>use(v,n,bound));n.vars.forEach(v=>vars.add(v));
+        const inner=new Map(rels);inner.set(n.R,{arity:n.vars.length,sign:1});
+        walk(n.body,new Set([...bound,...n.vars]),inner);return;
+      }
+    }
+  }
+  try{walk(ast,new Set(),new Map());}catch(e){if(e instanceof FErr)return {err:e};throw e;}
+  if(free.length){const f=free[0];return {err:new FErr(`The variable “${f.v}” is never introduced. Put ∃${f.v} (“there is a ${f.v}”) or ∀${f.v} (“for every ${f.v}”) in front of the part that uses it.`,f.n.s,f.n.e)};}
+  if(mode==='ef'&&hasLfp){const n=findK(ast,'lfp');return {err:new FErr('Fixed points (lfp) go beyond first-order logic, so they belong in the pebble game.',n.s,n.e,'needPebble')};}
+  const {CORE,root}=buildCore(ast);
+  const lfpParams=CORE.some(n=>n.k==='lfp'&&n.params.length);
+  return {ok:true,ast,CORE,core:root,rank:qrank(ast),nvars:vars.size,vars:[...vars],hasLfp,lfpParams};
+}
+function findK(n,k){if(!n)return null;if(n.k===k)return n;return findK(n.a,k)||findK(n.b,k)||findK(n.body,k);}
+function qrank(n){
+  switch(n.k){
+    case 'ex':case 'all':return 1+qrank(n.a);
+    case 'not':return qrank(n.a);
+    case 'and':case 'or':case 'imp':case 'iff':return Math.max(qrank(n.a),qrank(n.b));
+    case 'lfp':return qrank(n.body);
+    default:return 0;
+  }
+}
+
+/* --- evaluation --- */
+const SETID=new WeakMap();let SETC=0;
+const setId=s=>{if(!SETID.has(s))SETID.set(s,++SETC);return SETID.get(s);};
+function tupleKey(t,n){let k=0,m=1;for(let i=0;i<t.length;i++){k+=t[i]*m;m*=n;}return k;}
+function evalF(n,M,asg,rels,memo){
+  switch(n.k){
+    case 'const':return n.val;
+    case 'not':return !evalF(n.a,M,asg,rels,memo);
+    case 'and':return evalF(n.a,M,asg,rels,memo)&&evalF(n.b,M,asg,rels,memo);
+    case 'or':return evalF(n.a,M,asg,rels,memo)||evalF(n.b,M,asg,rels,memo);
+    case 'eq':return asg[n.x]===asg[n.y];
+    case 'rel':
+      if(n.name==='E')return M.E[asg[n.args[0]]*M.n+asg[n.args[1]]]===1;
+      return rels[n.name].has(tupleKey(n.args.map(v=>asg[v]),M.n));
+    case 'ex':case 'all':{
+      const had=Object.prototype.hasOwnProperty.call(asg,n.v),old=asg[n.v];const want=n.k==='ex';let res=!want;
+      for(let d=0;d<M.n;d++){asg[n.v]=d;if(evalF(n.a,M,asg,rels,memo)===want){res=want;break;}}
+      if(had)asg[n.v]=old;else delete asg[n.v];
+      return res;
+    }
+    case 'lfp':{const st=stagesOf(n,M,asg,rels,memo);return st[st.length-1].has(tupleKey(n.args.map(v=>asg[v]),M.n));}
+  }
+}
+function stagesOf(n,M,asg,rels,memo){
+  const key=n.cid+'|'+n.params.map(v=>asg[v]).join(',')+'|'+n.outer.map(r=>setId(rels[r])).join(',');
+  if(memo&&memo.has(key))return memo.get(key);
+  const st=computeStages(n,M,asg,rels,memo||new Map());
+  if(memo)memo.set(key,st);
+  return st;
+}
+function computeStages(n,M,asg,rels,memo){
+  const m=n.vars.length,N=Math.pow(M.n,m);
+  const stages=[new Set()];let cur=stages[0];
+  const a2=Object.assign({},asg);
+  for(let guard=0;guard<=N+1;guard++){
+    const nx=new Set();const r2=Object.assign({},rels,{[n.R]:cur});
+    for(let t=0;t<N;t++){let x=t;for(let i=0;i<m;i++){a2[n.vars[i]]=x%M.n;x=Math.floor(x/M.n);}if(evalF(n.body,M,a2,r2,memo))nx.add(t);}
+    if(nx.size===cur.size)break;
+    stages.push(nx);cur=nx;
+  }
+  return stages;
+}
+const evalTop=(F,M)=>evalF(F.core,M,{},{},new Map());
+
+/* --- printers --- */
+function pretty(ast,kind){
+  const PREC={iff:1,imp:2,or:3,and:4};
+  const OP={and:'∧',or:'∨',imp:'→',iff:'↔'};
+  const V=v=>`<span class="v">${esc(v)}</span>`;
+  const P=h=>`<span class="par">(</span>${h}<span class="par">)</span>`;
+  const isInfix=n=>n.k==='eq'||n.k==='neq'||(n.k==='rel'&&n.name==='E'&&kind==='order');
+  const isQ=n=>n.k==='ex'||n.k==='all'||(n.k==='not'&&isQ(n.a));
+  const prec=n=>PREC[n.k]||9;
+  const child=c=>{const h=go(c);return (PREC[c.k]||isInfix(c))?P(h):h;};
+  function go(n){
+    let h;
+    switch(n.k){
+      case 'const':h=`<span class="kw">${n.val?'true':'false'}</span>`;break;
+      case 'eq':h=`${V(n.x)} <span class="op">=</span> ${V(n.y)}`;break;
+      case 'neq':h=`${V(n.x)} <span class="op">≠</span> ${V(n.y)}`;break;
+      case 'rel':
+        if(n.name==='E'&&kind==='order')h=`${V(n.args[0])} <span class="op">&lt;</span> ${V(n.args[1])}`;
+        else h=`<span class="rel${n.name==='E'?'':' fix'}">${esc(n.name)}</span>(${n.args.map(V).join(', ')})`;
+        break;
+      case 'not':h=`<span class="op">¬</span>${child(n.a)}`;break;
+      case 'ex':case 'all':h=`<span class="q">${n.k==='ex'?'∃':'∀'}${V(n.v)}</span> ${child(n.a)}`;break;
+      case 'lfp':h=`[<span class="kw">lfp</span> <span class="rel fix">${esc(n.R)}</span>(${n.vars.map(V).join(', ')}) <span class="op">:</span> ${go(n.body)}](${n.args.map(V).join(', ')})`;break;
+      default:{
+        const p=PREC[n.k];let l=go(n.a),r=go(n.b);
+        if(prec(n.a)<p||(prec(n.a)===p&&(n.k==='imp'||n.k==='iff'))||isQ(n.a))l=P(l);
+        if(prec(n.b)<p||(prec(n.b)===p&&n.k==='iff'))r=P(r);
+        h=`${l} <span class="op">${OP[n.k]}</span> ${r}`;
+      }
+    }
+    return `<span class="f" data-id="${n.id}">${h}</span>`;
+  }
+  return go(ast);
+}
+function english(ast,kind){
+  const V=v=>`<i>${esc(v)}</i>`;
+  const relTxt=(a,b,neg)=>{
+    if(kind==='order')return neg?`${V(a)} does not come before ${V(b)}`:`${V(a)} comes before ${V(b)}`;
+    if(kind==='digraph')return neg?`there is no arrow from ${V(a)} to ${V(b)}`:`there is an arrow from ${V(a)} to ${V(b)}`;
+    return a===b?(neg?`${V(a)} has no loop`:`${V(a)} has a loop`):(neg?`${V(a)} and ${V(b)} are not adjacent`:`${V(a)} and ${V(b)} are adjacent`);
+  };
+  const flat=(n,k)=>n.k===k?[...flat(n.a,k),...flat(n.b,k)]:[n];
+  const list=(xs,w)=>xs.length===1?xs[0]:xs.slice(0,-1).join(', ')+` ${w} `+xs[xs.length-1];
+  const BIN=new Set(['and','or','imp','iff']);
+  const sub=n=>BIN.has(n.k)?`(${go(n)})`:go(n);
+  function go(n){
+    switch(n.k){
+      case 'const':return n.val?'true holds':'false holds';
+      case 'eq':return `${V(n.x)} and ${V(n.y)} are the same vertex`;
+      case 'neq':return `${V(n.x)} and ${V(n.y)} are different`;
+      case 'rel':if(n.name==='E')return relTxt(n.args[0],n.args[1],false);return n.args.length===1?`${V(n.args[0])} is in ${esc(n.name)}`:`(${n.args.map(V).join(', ')}) is in ${esc(n.name)}`;
+      case 'not':{const a=n.a;
+        if(a.k==='eq')return `${V(a.x)} and ${V(a.y)} are different`;
+        if(a.k==='neq')return `${V(a.x)} and ${V(a.y)} are the same vertex`;
+        if(a.k==='rel'&&a.name==='E')return relTxt(a.args[0],a.args[1],true);
+        if(a.k==='ex')return `there is no ${V(a.v)} such that ${go(a.a)}`;
+        return `it is not true that ${sub(a)}`;}
+      case 'and':return list(flat(n,'and').map(sub),'and');
+      case 'or':return 'either '+list(flat(n,'or').map(sub),'or');
+      case 'imp':return `if ${sub(n.a)}, then ${sub(n.b)}`;
+      case 'iff':return `${sub(n.a)} exactly when ${sub(n.b)}`;
+      case 'ex':{const vs=[];let m=n;while(m.k==='ex'){vs.push(m.v);m=m.a;}return vs.length===1?`there is some ${V(vs[0])} such that ${go(m)}`:`there are ${list(vs.map(V),'and')} such that ${go(m)}`;}
+      case 'all':{const vs=[];let m=n;while(m.k==='all'){vs.push(m.v);m=m.a;}return `for every ${list(vs.map(V),'and')}, ${go(m)}`;}
+      case 'lfp':{const tup=a=>a.length===1?V(a[0]):`(${a.map(V).join(', ')})`;return `${tup(n.args)} ends up in ${esc(n.R)}, where ${esc(n.R)} starts empty and keeps growing by adding every ${tup(n.vars)} such that ${go(n.body)}`;}
+    }
+  }
+  return go(ast)+'.';
+}
+
+/* =====================================================================
+   Worlds
+   ===================================================================== */
+const ring=(n,cx=.5,cy=.5,r=.42,rot=-Math.PI/2)=>Array.from({length:n},(_,i)=>({x:cx+r*Math.cos(rot+2*Math.PI*i/n),y:cy+r*Math.sin(rot+2*Math.PI*i/n)}));
+const cyc=(n,o=0)=>Array.from({length:n},(_,i)=>[o+i,o+(i+1)%n]);
+const zig=n=>Array.from({length:n},(_,i)=>({x:n===1?.5:.04+.92*i/(n-1),y:i%2?.66:.34}));
+const pathE=n=>Array.from({length:n-1},(_,i)=>[i,i+1]);
+const line=n=>Array.from({length:n},()=>({x:.5,y:.5}));
+const complete=n=>{const e=[];for(let i=0;i<n;i++)for(let j=i+1;j<n;j++)e.push([i,j]);return e;};
+const CONNECTED='∀x ∀y [lfp R(x,y) : E(x,y) ∨ ∃z (R(x,z) ∧ E(z,y))](x,y)';
+const FAMILIES=[['cycle','Cycle of length n',3],['complete','Complete graph on n',1],['disc','Disconnected graph',2]];
+const SENT={ef:'∃x ∃y ∃z (E(x,y) ∧ E(y,z) ∧ E(z,x))',pebble:CONNECTED};
+function makeGraph(fam,n){
+  if(fam==='cycle')return {name:`Cycle of length ${n}`,nodes:ring(n),edges:cyc(n)};
+  if(fam==='complete')return {name:`Complete graph on ${n}`,nodes:n===1?[{x:.5,y:.5}]:ring(n,.5,.5,.42,n===4?-Math.PI/4:-Math.PI/2),edges:complete(n)};
+  const a=Math.floor(n/2),b=n-a,nodes=[],edges=[];
+  const piece=(m,cx)=>{const off=nodes.length;
+    if(m>=3){nodes.push(...ring(m,cx,.54,.21));edges.push(...cyc(m,off));}
+    else if(m===2){nodes.push({x:cx-.1,y:.54},{x:cx+.1,y:.54});edges.push([off,off+1]);}
+    else nodes.push({x:cx,y:.54});};
+  piece(a,.22);piece(b,.78);
+  return {name:'Disconnected graph',nodes,edges};
+}
+const EXAMPLES={
+  graph:[['There is a triangle','∃x ∃y ∃z (E(x,y) ∧ E(y,z) ∧ E(z,x))'],['Someone is adjacent to everyone else','∃x ∀y (x = y ∨ E(x,y))'],['Everyone has a neighbour','∀x ∃y E(x,y)'],['Two vertices share no neighbour','∃x ∃y (x ≠ y ∧ ¬∃z (E(x,z) ∧ E(y,z)))'],['At least four vertices','∃x ∃y ∃z ∃w (x ≠ y ∧ x ≠ z ∧ x ≠ w ∧ y ≠ z ∧ y ≠ w ∧ z ≠ w)'],['Everything is connected',CONNECTED,'lfp']],
+  digraph:[['Every vertex has an arrow out','∀x ∃y E(x,y)'],['Someone has no arrow in','∃x ∀y ¬E(y,x)'],['A two-step arrow path','∃x ∃y ∃z (E(x,y) ∧ E(y,z))'],['Something can come back to itself','∃x [lfp R(x,y) : E(x,y) ∨ ∃z (R(x,z) ∧ E(z,y))](x,x)','lfp']],
+  order:[['There is a smallest vertex','∃x ∀y (x = y ∨ x < y)'],['Three in a row','∃x ∃y ∃z (x < y ∧ y < z)'],['Room above and below','∃x ∃y (x < y ∧ ∃z (z < x) ∧ ∃z (y < z))'],['A chain of four, two letters','∃x ∃y (x < y ∧ ∃x (y < x ∧ ∃y (x < y)))'],['Some vertex has no neighbour on the right','∃x ∀y (x = y ∨ y < x)']],
+};
+function toModel(w,kind){
+  const n=w.nodes.length,E=new Uint8Array(n*n);
+  if(kind==='order'){for(let i=0;i<n;i++)for(let j=i+1;j<n;j++)E[i*n+j]=1;}
+  else for(const [i,j] of w.edges){E[i*n+j]=1;if(kind==='graph')E[j*n+i]=1;}
+  return {n,E};
+}
+const hasE=(side,i,j)=>M[side].E[i*M[side].n+j]===1;
+
+/* =====================================================================
+   Oracle (runs in a worker): exact winner for small worlds
+   ===================================================================== */
+function oracleWorkerMain(){
+  let mode,k,A,B,nA,nB,P,compat,selfok,ready=false,ops=0,budget=0,memo=null,idx=null,rank=null;
+  const INF=1e9;
+  const keyOf=S=>{let x=0;for(let i=0;i<S.length;i++)x=x*256+(S[i]+1);return x;};
+  const tick=()=>{if(++ops>budget)throw new Error('budget');};
+  function okWith(S,p){if(!selfok[p])return false;const row=p*P;for(let i=0;i<S.length;i++)if(!compat[row+S[i]])return false;return true;}
+  function addPair(S,p){let i=0;while(i<S.length&&S[i]<p)i++;if(S[i]===p)return S;const T=S.slice();T.splice(i,0,p);return T;}
+  const canon=a=>Array.from(new Set(a)).sort((x,y)=>x-y);
+  const pairOf=(side,x,y)=>side==='A'?x*nB+y:y*nB+x;
+  function dupWin(S,r){
+    if(r===0)return true;
+    const key=keyOf(S)*8+r;const c=memo.get(key);if(c!==undefined)return c;
+    tick();let res=true;
+    for(let s=0;s<2&&res;s++){const side=s?'B':'A',n=s?nB:nA,m=s?nA:nB;
+      for(let x=0;x<n&&res;x++){let found=false;
+        for(let y=0;y<m;y++){const p=pairOf(side,x,y);if(!okWith(S,p))continue;if(dupWin(addPair(S,p),r-1)){found=true;break;}}
+        if(!found)res=false;}}
+    memo.set(key,res);return res;
+  }
+  const needOf=(S,r)=>{for(let rr=1;rr<=r;rr++)if(!dupWin(S,rr))return rr;return INF;};
+  function rankOf(S){const i=idx.get(keyOf(S));return i===undefined?0:rank[i];}
+  function computeRanks(){
+    const states=[];idx=new Map();
+    (function rec(start,cur){tick();idx.set(keyOf(cur),states.length);states.push(cur);if(cur.length===k)return;for(let p=start;p<P;p++)if(okWith(cur,p))rec(p+1,cur.concat([p]));})(0,[]);
+    rank=new Float64Array(states.length).fill(INF);
+    for(let t=1;;t++){
+      const fresh=[];
+      for(let i=0;i<states.length;i++){if(rank[i]!==INF)continue;if(spoilerWinsBy(states[i],t))fresh.push(i);}
+      if(!fresh.length)break;
+      for(const i of fresh)rank[i]=t;
+    }
+  }
+  function spoilerWinsBy(S,t){
+    const bases=[];if(S.length<k)bases.push(S);for(let i=0;i<S.length;i++)bases.push(S.slice(0,i).concat(S.slice(i+1)));
+    for(const base of bases)for(let s=0;s<2;s++){const side=s?'B':'A',n=s?nB:nA,m=s?nA:nB;
+      for(let x=0;x<n;x++){let all=true;
+        for(let y=0;y<m;y++){tick();const p=pairOf(side,x,y);if(!okWith(base,p))continue;if(rankOf(addPair(base,p))>=t){all=false;break;}}
+        if(all)return true;}}
+    return false;
+  }
+  function analyse(m){
+    if(!ready)throw new Error('notready');
+    ops=0;budget=3e7;
+    if(mode==='ef'){
+      const S=canon(m.pairs),r=m.r;
+      if(m.kind==='sp'){
+        const dw=dupWin(S,r),need=dw?INF:needOf(S,r),winning=[];
+        if(!dw)for(const side of ['A','B']){const n=side==='A'?nA:nB,mm=side==='A'?nB:nA;
+          for(let x=0;x<n;x++){let ok=true;for(let y=0;y<mm;y++){const p=pairOf(side,x,y);if(okWith(S,p)&&dupWin(addPair(S,p),need-1)){ok=false;break;}}if(ok)winning.push({side,el:x});}}
+        return {dupWins:dw,need,winning};
+      }
+      const out=[],mm=m.side==='A'?nB:nA;
+      for(let y=0;y<mm;y++){const p=pairOf(m.side,m.x,y),valid=okWith(S,p);let dw=false,need=0;
+        if(valid){const S2=addPair(S,p);dw=dupWin(S2,r-1);need=dw?INF:needOf(S2,r-1);}
+        out.push({el:y,valid,dupWins:valid&&dw,need});}
+      return {responses:out};
+    }
+    const as=m.assign;
+    if(m.kind==='sp'){
+      const S=canon(as.filter(p=>p>=0)),rk=rankOf(S),winning=[];
+      if(rk<INF)for(let i=0;i<k;i++){const base=canon(as.filter((p,j)=>j!==i&&p>=0));
+        for(const side of ['A','B']){const n=side==='A'?nA:nB,mm=side==='A'?nB:nA;
+          for(let x=0;x<n;x++){let worst=0;for(let y=0;y<mm;y++){const p=pairOf(side,x,y);if(!okWith(base,p))continue;const r2=rankOf(addPair(base,p));if(r2>worst)worst=r2;if(worst>=rk)break;}
+            if(worst<=rk-1)winning.push({peb:i,side,el:x});}}}
+      return {rank:rk,winning};
+    }
+    const base=canon(as.filter((p,j)=>j!==m.peb&&p>=0)),out=[],mm=m.side==='A'?nB:nA;
+    for(let y=0;y<mm;y++){const p=pairOf(m.side,m.x,y),valid=okWith(base,p);out.push({el:y,valid,rank:valid?rankOf(addPair(base,p)):0});}
+    return {responses:out};
+  }
+  self.onmessage=e=>{
+    const m=e.data;
+    if(m.type==='setup'){
+      try{
+        mode=m.mode;k=m.k;A=m.A;B=m.B;nA=A.n;nB=B.n;P=nA*nB;ops=0;budget=m.budget;
+        const EA=(i,j)=>A.E[i*nA+j],EB=(i,j)=>B.E[i*nB+j];
+        compat=new Uint8Array(P*P);selfok=new Uint8Array(P);
+        for(let p=0;p<P;p++){const a=(p/nB)|0,b=p%nB;selfok[p]=EA(a,a)===EB(b,b)?1:0;
+          for(let q=0;q<P;q++){const a2=(q/nB)|0,b2=q%nB;compat[p*P+q]=((a===a2)===(b===b2)&&EA(a,a2)===EB(b,b2)&&EA(a2,a)===EB(b2,b))?1:0;}}
+        if(mode==='ef'){memo=new Map();dupWin([],k);}else computeRanks();
+        ready=true;postMessage({type:'ready'});
+      }catch(err){postMessage({type:'toobig'});}
+      return;
+    }
+    try{postMessage({qid:m.qid,ok:true,res:analyse(m)});}catch(err){postMessage({qid:m.qid,ok:false,error:String(err&&err.message||err)});}
+  };
+}
+const workerURL=URL.createObjectURL(new Blob([`(${oracleWorkerMain.toString()})()`],{type:'text/javascript'}));
+const INF=1e9;
+const Oracle={
+  w:null,key:null,status:'idle',qid:0,wait:new Map(),cache:new Map(),inflight:new Map(),timer:null,
+  setup(){
+    const key=JSON.stringify([S.mode,S.k,M.A.n,Array.from(M.A.E).join(''),M.B.n,Array.from(M.B.E).join('')]);
+    if(key===this.key)return;
+    this.key=key;this.cache.clear();this.inflight.clear();
+    if(this.w)this.w.terminate();this.w=null;
+    this.wait.forEach(r=>r.reject('reset'));this.wait.clear();
+    clearTimeout(this.timer);
+    if(typeof Worker==='undefined'){this.status='error';return;}
+    try{this.w=new Worker(workerURL);}catch(e){this.status='error';return;}
+    this.status='busy';
+    this.w.onmessage=e=>this.onMsg(e.data);
+    this.w.onerror=()=>{this.status='error';renderPanels();};
+    this.w.postMessage({type:'setup',mode:S.mode,k:S.k,A:{n:M.A.n,E:Array.from(M.A.E)},B:{n:M.B.n,E:Array.from(M.B.E)},budget:S.mode==='ef'?4e7:1.5e8});
+    this.timer=setTimeout(()=>{if(this.status==='busy'){this.w.terminate();this.w=null;this.status='toobig';this.wait.forEach(r=>r.reject('toobig'));this.wait.clear();renderPanels();}},20000);
+  },
+  onMsg(d){
+    if(d.type==='ready'){this.status='ready';clearTimeout(this.timer);renderPanels();return;}
+    if(d.type==='toobig'){this.status='toobig';clearTimeout(this.timer);renderPanels();return;}
+    const r=this.wait.get(d.qid);this.wait.delete(d.qid);
+    if(r){d.ok?r.resolve(d.res):r.reject(d.error);}
+  },
+  ask(key,msg){
+    if(this.cache.has(key))return Promise.resolve(this.cache.get(key));
+    if(this.inflight.has(key))return this.inflight.get(key);
+    if(!this.w||this.status==='toobig'||this.status==='error')return Promise.reject('unavailable');
+    const qid=++this.qid,okey=this.key;
+    const pr=new Promise((res,rej)=>this.wait.set(qid,{resolve:res,reject:rej}))
+      .then(r=>{this.inflight.delete(key);if(okey===this.key)this.cache.set(key,r);return r;},e=>{this.inflight.delete(key);throw e;});
+    this.inflight.set(key,pr);
+    this.w.postMessage(Object.assign({type:'analyse',qid},msg));
+    return pr;
+  },
+  get:function(key){return this.cache.get(key);}
+};
+const withTimeout=(p,ms)=>Promise.race([p,new Promise((_,rej)=>setTimeout(()=>rej('timeout'),ms))]);
+
+/* =====================================================================
+   Game state
+   ===================================================================== */
+const S={
+  mode:'ef',kind:'graph',worlds:null,gsel:{A:{fam:'cycle',n:6},B:{fam:'disc',n:6}},customSide:{A:true,B:true},text:'',dirty:false,
+  F:{empty:true},coachF:null,lastSig:null,
+  k:3,kAuto:true,limit:12,
+  players:{spoiler:'human',dup:'human'},
+  showOracle:false,
+  editing:false,tool:'draw',
+  game:null,history:[],coach:null,hint:null,selPeb:0,lastUsed:[],hoverLog:-1,gameId:0,resultMini:false,
+};
+let M={A:null,B:null};
+const pairIdx=(a,b)=>a*M.B.n+b;
+const canonPairs=arr=>Array.from(new Set(arr)).sort((x,y)=>x-y);
+
+function currentPairs(){
+  const g=S.game;
+  if(S.mode==='ef')return g.picks.map((p,i)=>({lab:i,a:p.a,b:p.b,side:p.side}));
+  return g.pebbles.map((p,i)=>p?{lab:i,a:p.a,b:p.b,side:p.side}:null).filter(Boolean);
+}
+function posOf(slot,side){
+  const g=S.game;
+  if(S.mode==='ef'){const p=g.picks[slot];return p?(side==='A'?p.a:p.b):null;}
+  const p=g.pebbles[slot];return p?(side==='A'?p.a:p.b):null;
+}
+function findViolation(){
+  const ps=currentPairs();
+  for(let i=0;i<ps.length;i++)for(let j=i+1;j<ps.length;j++){
+    const x=ps[i],y=ps[j];
+    const sameA=x.a===y.a,sameB=x.b===y.b;
+    if(sameA!==sameB)return {type:'eq',i:x.lab,j:y.lab,same:sameA?'A':'B',pi:x,pj:y};
+    if(sameA)continue;
+    for(const [u,v] of [[x,y],[y,x]]){
+      const eA=hasE('A',u.a,v.a),eB=hasE('B',u.b,v.b);
+      if(eA!==eB)return {type:'edge',i:u.lab,j:v.lab,has:eA?'A':'B',pi:u,pj:v};
+    }
+  }
+  return null;
+}
+const spKeyOf=g=>S.mode==='ef'?'ef:'+canonPairs(g.picks.map(p=>pairIdx(p.a,p.b))).join('.')+'|'+(S.k-g.picks.length):'pb:'+g.pebbles.map(p=>p?pairIdx(p.a,p.b):-1).join('.');
+const spMsgOf=g=>S.mode==='ef'?{kind:'sp',pairs:g.picks.map(p=>pairIdx(p.a,p.b)),r:S.k-g.picks.length}:{kind:'sp',assign:g.pebbles.map(p=>p?pairIdx(p.a,p.b):-1)};
+const startKey=()=>S.mode==='ef'?'ef:|'+S.k:'pb:'+Array(S.k).fill(-1).join('.');
+const startMsg=()=>S.mode==='ef'?{kind:'sp',pairs:[],r:S.k}:{kind:'sp',assign:Array(S.k).fill(-1)};
+function remainingBefore(g){return S.mode==='ef'?S.k-g.picks.length:S.limit-g.moves;}
+function spoilerWinsFrom(an,rem){if(!an)return null;return S.mode==='ef'?!an.dupWins:an.rank<=rem;}
+function respSaves(r,rem){return S.mode==='ef'?r.valid&&r.dupWins:r.valid&&r.rank>rem-1;}
+
+function newGame(){
+  S.gameId++;
+  S.game=S.mode==='ef'?{phase:'spoiler',picks:[],pending:null,log:[],result:null,fresh:0}:{phase:'spoiler',pebbles:Array(S.k).fill(null),pending:null,log:[],moves:0,result:null,fresh:0};
+  S.history=[];S.hint=null;S.selPeb=0;S.lastUsed=[...Array(S.k).keys()];S.resultMini=false;
+  S.coach=makeCoach();S.coachF=S.F;
+  if(!S.editing)Oracle.setup();
+  turnStarted();
+}
+function turnStarted(){
+  const g=S.game;
+  if(g.phase==='spoiler'){autoSelectPeb();coachPlan();}
+  requestCurrent();renderAll();scheduleCPU();
+}
+function autoSelectPeb(){
+  if(S.mode!=='pebble')return;
+  const g=S.game;const free=g.pebbles.findIndex(p=>!p);
+  S.selPeb=free>=0?free:S.lastUsed[0];
+}
+function pushHistory(){S.history.push(structuredClone({game:S.game,coach:S.coach,selPeb:S.selPeb,lastUsed:S.lastUsed}));}
+function undo(){
+  if(!S.history.length)return;
+  let snap=S.history.pop();
+  const humanTurn=s=>{const ph=s.game.phase;return (ph==='spoiler'&&S.players.spoiler==='human')||(ph==='dup'&&S.players.dup==='human');};
+  while(!humanTurn(snap)&&S.history.length&&(S.players.spoiler==='human'||S.players.dup==='human'))snap=S.history.pop();
+  S.gameId++;
+  S.game=snap.game;S.coach=snap.coach;S.selPeb=snap.selPeb;S.lastUsed=snap.lastUsed;S.hint=null;S.resultMini=false;
+  S.game.fresh=0;
+  requestCurrent();renderAll();scheduleCPU();
+}
+function spoilerMove(side,el,peb){
+  const g=S.game;if(g.phase!=='spoiler')return;
+  pushHistory();
+  if(S.mode==='pebble'){
+    if(peb==null)peb=S.selPeb;
+    g.pebbles[peb]=null;
+    const assign=g.pebbles.map(p=>p?pairIdx(p.a,p.b):-1);
+    g.pending={peb,side,el,spKey:S.history[S.history.length-1]&&spKeyOf(S.history[S.history.length-1].game),key:'pbd:'+assign.join('.')+'>'+peb+side+el,msg:{kind:'dup',assign,peb,side,x:el}};
+    S.lastUsed=S.lastUsed.filter(i=>i!==peb).concat([peb]);
+  }else{
+    const pairs=g.picks.map(p=>pairIdx(p.a,p.b));
+    g.pending={side,el,spKey:spKeyOf(g),key:'efd:'+canonPairs(pairs).join('.')+'|'+(S.k-g.picks.length)+'>'+side+el,msg:{kind:'dup',pairs,r:S.k-g.picks.length,side,x:el}};
+  }
+  g.phase='dup';S.hint=null;
+  coachOnSpoiler(side,el,S.mode==='pebble'?peb:g.picks.length);
+  turnStarted();
+}
+function dupMove(el){
+  const g=S.game;if(g.phase!=='dup')return;
+  pushHistory();
+  const mv=g.pending;
+  const a=mv.side==='A'?mv.el:el,b=mv.side==='A'?el:mv.el;
+  const remBefore=remainingBefore(g);
+  if(S.mode==='ef')g.picks.push({side:mv.side,a,b});
+  else{g.pebbles[mv.peb]={a,b,side:mv.side};g.moves++;}
+  g.log.push({side:mv.side,el:mv.el,resp:el,peb:mv.peb,a,b,spKey:mv.spKey,dKey:mv.key,rem:remBefore});
+  g.pending=null;g.fresh=Date.now();S.hint=null;
+  coachOnDup();
+  const v=findViolation();
+  if(v){g.result={winner:'spoiler',v};g.phase='over';}
+  else if(S.mode==='ef'?g.picks.length>=S.k:g.moves>=S.limit){g.result={winner:'dup'};g.phase='over';}
+  else g.phase='spoiler';
+  turnStarted();
+}
+function requestCurrent(){
+  const g=S.game;if(!g||S.editing)return;
+  const jobs=[[startKey(),startMsg()]];
+  if(g.phase==='spoiler')jobs.push([spKeyOf(g),spMsgOf(g)]);
+  else if(g.phase==='dup')jobs.push([g.pending.key,g.pending.msg]);
+  for(const [k,m] of jobs)Oracle.ask(k,m).then(()=>renderPanels()).catch(()=>{});
+}
+
+/* =====================================================================
+   The sentence as Spoiler's plan
+   ===================================================================== */
+function makeCoach(){
+  const F=S.F;if(!F||!F.ok||!M.A)return null;
+  if(F.truth.A===F.truth.B)return {status:'agree'};
+  if(F.lfpParams)return {status:'params'};
+  return {status:'on',T:F.truth.A?'A':'B',nodeId:F.core.cid,env:{},rel:{},q:null,notes:[]};
+}
+function coachAsg(c,side){const a={};for(const v in c.env){const e=posOf(c.env[v],side);if(e!=null)a[v]=e;}return a;}
+function coachRels(c,side){const r={};for(const R in c.rel){const info=c.rel[R];r[R]=side===info.T?info.stages[info.level]:info.fixF;}return r;}
+function coachTrue(c,node,side,extra){return evalF(node,M[side],Object.assign(coachAsg(c,side),extra||{}),coachRels(c,side),new Map());}
+function coachPlan(){
+  const c=S.coach;if(!c||c.status!=='on'||c.q)return;
+  const CORE=S.coachF.CORE;const notes=[];
+  const stuck=why=>{c.status='stuck';c.why=why;};
+  for(let guard=0;guard<2000;guard++){
+    const n=CORE[c.nodeId],T=c.T,F=other(T);
+    switch(n.k){
+      case 'not':c.nodeId=n.a.cid;c.T=F;continue;
+      case 'and':{const pick=[n.a,n.b].find(ch=>!coachTrue(c,ch,F));if(!pick)return stuck('lost');c.nodeId=pick.cid;continue;}
+      case 'or':{const pick=[n.a,n.b].find(ch=>coachTrue(c,ch,T));if(!pick)return stuck('lost');c.nodeId=pick.cid;continue;}
+      case 'eq':case 'const':c.status='done';return;
+      case 'rel':{
+        if(n.name==='E'){c.status='done';return;}
+        const info=c.rel[n.name];if(!info||info.T!==T)return stuck('lost');
+        const a=coachAsg(c,T);const key=tupleKey(n.args.map(v=>a[v]),M[T].n);
+        let s=1;while(s<=info.level&&!info.stages[s].has(key))s++;
+        if(s>info.level)return stuck('lost');
+        const L=CORE[info.lfpId];const env={};L.vars.forEach((v,i)=>env[v]=c.env[n.args[i]]);
+        c.env=env;info.level=s-1;c.nodeId=L.body.cid;notes.push({R:n.name,s,T});continue;
+      }
+      case 'lfp':{
+        const aT=coachAsg(c,T),aF=coachAsg(c,F);
+        const stT=computeStages(n,M[T],aT,coachRels(c,T),new Map()),stF=computeStages(n,M[F],aF,coachRels(c,F),new Map());
+        const key=tupleKey(n.args.map(v=>aT[v]),M[T].n);
+        let s=0;while(s<stT.length&&!stT[s].has(key))s++;
+        if(s>=stT.length||s===0)return stuck('lost');
+        const env={};n.vars.forEach((v,i)=>env[v]=c.env[n.args[i]]);
+        c.rel[n.R]={T,stages:stT,level:s-1,fixF:stF[stF.length-1],lfpId:n.cid};
+        c.env=env;c.nodeId=n.body.cid;notes.push({R:n.R,s,T});continue;
+      }
+      case 'ex':case 'all':{
+        const side=n.k==='ex'?T:F,want=n.k==='ex';let w=-1;
+        for(let d=0;d<M[side].n;d++){if(coachTrue(c,n.a,side,{[n.v]:d})===want){w=d;break;}}
+        if(w<0)return stuck('lost');
+        let slot;
+        if(S.mode==='ef'){slot=S.game.picks.length;if(slot>=S.k)return stuck('rounds');}
+        else{
+          const used=new Set(n.fv.map(v=>c.env[v]));const g=S.game;slot=-1;
+          for(let i=0;i<S.k;i++)if(!used.has(i)&&!g.pebbles[i]){slot=i;break;}
+          if(slot<0)for(const i of S.lastUsed)if(!used.has(i)){slot=i;break;}
+          if(slot<0)return stuck('pebbles');
+        }
+        c.q={nodeId:n.cid,v:n.v,kind:n.k,side,el:w,slot,T,notes};
+        return;
+      }
+    }
+  }
+  stuck('lost');
+}
+function coachOnSpoiler(side,el,slot){
+  const c=S.coach;if(!c||c.status!=='on'||!c.q)return;
+  const q=c.q;
+  let ok=q.side===side&&q.el===el;
+  if(ok&&S.mode==='pebble'&&slot!==q.slot){const n=S.coachF.CORE[q.nodeId];const used=new Set(n.fv.map(v=>c.env[v]));if(used.has(slot))ok=false;}
+  if(!ok){c.status='off';c.q=null;return;}
+  q.slot=slot;q.made=true;
+}
+function coachOnDup(){
+  const c=S.coach;if(!c||c.status!=='on'||!c.q||!c.q.made)return;
+  c.env[c.q.v]=c.q.slot;c.nodeId=S.coachF.CORE[c.q.nodeId].a.cid;c.q=null;
+}
+function coachCaption(c){
+  const q=c.q;const V=`<i>${esc(q.v)}</i>`;const F=other(q.T);
+  let pre='';
+  if(q.notes&&q.notes.length){const nt=q.notes[q.notes.length-1];pre=`Unfold ${esc(nt.R)} one step: in ${nt.T} this gets in at step ${nt.s}, in ${other(nt.T)} it never does. `;}
+  const peb=S.mode==='pebble'?` with the ${pebDot(q.slot)} ${PEB[q.slot].name} pebbles`:'';
+  if(q.kind==='ex')return pre+`“∃${V} …” holds in ${q.T} but fails in ${F}. So Spoiler picks a witness for ${V} in ${q.T}${peb}.`;
+  return pre+`“∀${V} …” holds in ${q.T} but fails in ${F}. So Spoiler picks a counterexample for ${V} in ${F}${peb}.`;
+}
+
+/* =====================================================================
+   Computer players and hints
+   ===================================================================== */
+function scheduleCPU(){
+  clearTimeout(S.cpuT);
+  const g=S.game;if(!g||g.phase==='over'||S.editing)return;
+  const who=g.phase==='spoiler'?'spoiler':'dup';if(S.players[who]!=='cpu')return;
+  const id=S.gameId,n=g.log.length,ph=g.phase;
+  const fresh=()=>S.gameId===id&&S.game.log.length===n&&S.game.phase===ph&&!S.editing;
+  S.cpuT=setTimeout(async()=>{
+    if(!fresh())return;
+    let mv=null;try{mv=who==='spoiler'?await cpuSpoiler():await cpuDup();}catch(e){mv=null;}
+    if(!fresh()||!mv)return;
+    if(who==='spoiler')spoilerMove(mv.side,mv.el,mv.peb);else dupMove(mv.el);
+  },S.players.spoiler==='cpu'&&S.players.dup==='cpu'?1100:750);
+}
+const rnd=a=>a[Math.floor(Math.random()*a.length)];
+async function cpuSpoiler(){
+  const g=S.game,c=S.coach;
+  if(c&&c.status==='on'&&c.q)return {side:c.q.side,el:c.q.el,peb:c.q.slot};
+  try{const an=await withTimeout(Oracle.ask(spKeyOf(g),spMsgOf(g)),5000);if(an.winning&&an.winning.length){const w=an.winning[0];return {side:w.side,el:w.el,peb:w.peb};}}catch(e){}
+  const side=rnd(SIDES);const el=Math.floor(Math.random()*M[side].n);
+  return {side,el,peb:S.mode==='pebble'?S.selPeb:undefined};
+}
+async function cpuDup(){
+  const g=S.game,mv=g.pending,tgt=other(mv.side),rem=remainingBefore(g);
+  try{
+    const dn=await withTimeout(Oracle.ask(mv.key,mv.msg),5000);
+    const rs=dn.responses.filter(r=>r.valid);
+    if(rs.length){
+      const score=r=>S.mode==='ef'?(r.dupWins?INF*2:r.need):r.rank;
+      const best=Math.max(...rs.map(score));return {el:rnd(rs.filter(r=>score(r)===best)).el};
+    }
+  }catch(e){}
+  const opts=[];for(let y=0;y<M[tgt].n;y++)opts.push(y);
+  const safe=opts.filter(y=>{const save=structuredClone(S.game);dupApplyTemp(y);const ok=!findViolation();S.game=save;return ok;});
+  return {el:rnd(safe.length?safe:opts)};
+}
+function dupApplyTemp(el){
+  const g=S.game,mv=g.pending;const a=mv.side==='A'?mv.el:el,b=mv.side==='A'?el:mv.el;
+  if(S.mode==='ef')g.picks.push({side:mv.side,a,b});else g.pebbles[mv.peb]={a,b,side:mv.side};
+}
+async function showHint(){
+  const g=S.game;if(!g||g.phase==='over')return;
+  if(g.phase==='spoiler'){
+    const c=S.coach;
+    if(c&&c.status==='on'&&c.q){S.hint={who:'s',nodes:[{side:c.q.side,el:c.q.el}],peb:c.q.slot,text:''};if(S.mode==='pebble')S.selPeb=c.q.slot;renderAll();return;}
+    S.hint={who:'s',nodes:[],text:'Asking the oracle…'};renderAll();
+    try{
+      const an=await withTimeout(Oracle.ask(spKeyOf(g),spMsgOf(g)),8000);if(S.game!==g||g.phase!=='spoiler')return;
+      if(an.winning.length){
+        let ws=an.winning;if(S.mode==='pebble'){const p0=ws[0].peb;S.selPeb=p0;ws=ws.filter(w=>w.peb===p0);}
+        const nodes=[];const seen=new Set();for(const w of ws){const k=w.side+w.el;if(!seen.has(k)){seen.add(k);nodes.push({side:w.side,el:w.el});}}
+        const need=S.mode==='ef'?an.need:an.rank;
+        S.hint={who:'s',nodes,peb:S.mode==='pebble'?S.selPeb:null,text:`Any glowing vertex${S.mode==='pebble'?` (with the ${PEB[S.selPeb].name} pebbles)`:''} keeps Spoiler on track to win in ${need} more ${S.mode==='ef'?'round':'move'}${need>1?'s':''}.`};
+      }else S.hint={who:'s',nodes:[],text:'There is no winning move here: with perfect play, Duplicator can hold out. Try anything.'};
+    }catch(e){S.hint={who:'s',nodes:[],text:oracleUnavailableText()};}
+    renderAll();return;
+  }
+  const mv=g.pending,rem=remainingBefore(g);
+  S.hint={who:'d',nodes:[],text:'Asking the oracle…'};renderAll();
+  try{
+    const dn=await withTimeout(Oracle.ask(mv.key,mv.msg),8000);if(S.game!==g||g.phase!=='dup')return;
+    const tgt=other(mv.side);
+    const safe=dn.responses.filter(r=>respSaves(r,rem));
+    if(safe.length)S.hint={who:'d',nodes:safe.map(r=>({side:tgt,el:r.el})),text:`Each glowing vertex lets Duplicator survive with perfect play.`};
+    else{const legal=dn.responses.filter(r=>r.valid);S.hint={who:'d',nodes:legal.map(r=>({side:tgt,el:r.el})),text:legal.length?`Every answer loses eventually. The glowing ones at least keep the picks matching for now.`:`Every answer breaks the match right away. Spoiler has won this one.`};}
+  }catch(e){S.hint={who:'d',nodes:[],text:oracleUnavailableText()};}
+  renderAll();
+}
+function oracleUnavailableText(){return Oracle.status==='toobig'?'These graphs are too big for the oracle to solve, so no hint is available.':'The oracle is still thinking. Try again in a moment.';}
+
+/* =====================================================================
+   Rendering helpers
+   ===================================================================== */
+const $=s=>document.querySelector(s);
+const AV={
+  s:`<svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="16" style="fill:var(--spoiler)"/><circle cx="14" cy="14" r="6.2" fill="none" style="stroke:var(--on-accent)" stroke-width="2.6"/><path d="M18.6 18.6 24 24" style="stroke:var(--on-accent)" stroke-width="3" stroke-linecap="round"/></svg>`,
+  d:`<svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="16" style="fill:var(--dup)"/><circle cx="12.4" cy="16" r="5.6" fill="none" style="stroke:var(--on-accent)" stroke-width="2.6"/><circle cx="19.6" cy="16" r="5.6" fill="none" style="stroke:var(--on-accent)" stroke-width="2.6"/></svg>`,
+};
+document.querySelectorAll('[data-av]').forEach(e=>e.innerHTML=AV[e.dataset.av]);
+const pebDot=i=>`<span style="display:inline-block;width:.8em;height:.8em;border-radius:50%;background:${PEB[i].c};vertical-align:-.05em"></span>`;
+const elName=(side,i)=>`${side}${i+1}`;
+let toastT;
+function toast(msg){const t=$('#toast');t.textContent=msg;t.classList.add('on');clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('on'),2200);}
+function plural(n,w){return `${n} ${w}${n===1?'':'s'}`;}
+
+function renderAll(){renderModes();renderSentence();renderSetup();renderPanels();renderBoard();}
+function renderPanels(){renderPlan();renderOracle();renderTurn();renderTray();renderLog();renderResult();renderLegend();}
+
+function renderModes(){
+  document.querySelectorAll('.mode').forEach(b=>b.setAttribute('aria-selected',String(b.dataset.mode===S.mode)));
+  $('#pageH').textContent=S.mode==='ef'?'EF Game':'Pebble Game';
+}
+
+/* ---- sentence card ---- */
+function renderSentence(){
+  const F=S.F,st=$('#fxStatus'),ok=$('#fxOk'),fx=$('#fx');
+  fx.classList.toggle('bad',!!F.err);
+  renderExamples();
+  if(F.empty){st.innerHTML=`<span class="note">Type a sentence about the graphs, or pick one above. You can play without one too.</span>`;ok.hidden=true;return;}
+  if(F.err){
+    const e=F.err,src=S.text;
+    st.innerHTML=`<div class="err"><b>Not quite a sentence yet.</b> ${esc(e.message)}<span class="snip">${esc(src.slice(Math.max(0,e.s-24),e.s))}<mark>${esc(src.slice(e.s,e.e))}</mark>${esc(src.slice(e.e,e.e+24))}</span>${e.code==='needPebble'?'<button class="switch" id="toPebble">Switch to the pebble game</button>':''}</div>`;
+    const b=$('#toPebble');if(b)b.onclick=()=>setMode('pebble');
+    ok.hidden=true;return;
+  }
+  st.innerHTML='';ok.hidden=false;
+}
+function renderExamples(){
+  const list=EXAMPLES[S.kind].filter(e=>S.mode==='pebble'||e[2]!=='lfp');
+  const h=list.map(([l,f])=>`<button class="ex" data-f="${esc(f)}" title="${esc(f)}">${esc(l)}</button>`).join('');
+  $('#exList').innerHTML=h;
+}
+function renderPlan(){}
+
+/* ---- setup card ---- */
+function renderSetup(){
+  $('#gpick').innerHTML=SIDES.map(side=>{const gs=S.gsel[side],cust=S.customSide[side];const min=(FAMILIES.find(f=>f[0]===gs.fam)||[0,0,1])[2];
+    return `<div class="gpick"><span class="gl">${side}</span><select id="fam${side}" data-side="${side}" aria-label="Graph ${side}"><option value="custom" ${cust?'selected':''}>Draw your own</option>${FAMILIES.map(([v,l])=>`<option value="${v}" ${!cust&&gs.fam===v?'selected':''}>${l}</option>`).join('')}</select>${cust?'':`<span class="nl">n</span><div class="stepper"><button data-n="${side}:-1" aria-label="Fewer vertices in ${side}" ${gs.n<=min?'disabled':''}>−</button><output>${gs.n}</output><button data-n="${side}:1" aria-label="More vertices in ${side}" ${gs.n>=MAXN?'disabled':''}>+</button></div>`}</div>`;}).join('');
+  [['#plS','spoiler'],['#plD','dup']].forEach(([id,who])=>$(id).querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.v===S.players[who]))));
+}
+
+/* ---- oracle card ---- */
+function renderOracle(){
+  const tg=$('#orToggle');tg.setAttribute('aria-checked',String(S.showOracle));
+  const body=$('#oracleBody');
+  if(!S.showOracle){body.innerHTML='';return;}
+  if(S.editing){body.innerHTML=`<p class="oracle-off">Finish drawing to analyse the new graphs.</p>`;return;}
+  if(Oracle.status==='toobig'||Oracle.status==='error'){body.innerHTML=`<p class="oracle-off">These graphs are too big to solve exactly in the browser. Try fewer vertices, ${S.mode==='ef'?'rounds':'pebbles'}.</p>`;return;}
+  const g=S.game;let pos=50,txt='Thinking…';
+  if(g.phase==='spoiler'||g.phase==='over'){
+    const an=Oracle.get(g.phase==='over'?startKey():spKeyOf(g));
+    if(an){
+      const rem=g.phase==='over'?(S.mode==='ef'?S.k:S.limit):remainingBefore(g);
+      const sw=spoilerWinsFrom(an,rem);const need=S.mode==='ef'?an.need:an.rank;const unit=S.mode==='ef'?'round':'move';
+      if(sw){pos=10+Math.min(need,8)*4;txt=`${g.phase==='over'?'From the start, ':''}Spoiler can force a win in ${plural(need,unit)}${g.phase==='over'?'.':', whatever Duplicator does.'}`;}
+      else{pos=86;
+        if(S.mode==='ef')txt=`${g.phase==='over'?'From the start, ':''}Duplicator can survive ${g.phase==='over'?`all ${S.k}`:`the remaining ${rem}`} round${rem===1?'':'s'}, whatever Spoiler does.`;
+        else if(an.rank>=INF)txt=`${g.phase==='over'?'From the start, ':''}Duplicator can survive forever with ${plural(S.k,'pebble pair')} in play.`;
+        else txt=`Spoiler would need ${plural(an.rank,'move')}, but only ${rem} remain${rem===1?'s':''}. Duplicator can hold out.`;}
+    }
+  }else if(g.phase==='dup'){
+    const dn=Oracle.get(g.pending.key);
+    if(dn){const rem=remainingBefore(g);const safe=dn.responses.filter(r=>respSaves(r,rem)).length,n=dn.responses.length;
+      pos=safe?78:20;txt=safe?`${safe} of ${n} possible answers keep Duplicator safe with perfect play.`:`None of the ${n} possible answers saves Duplicator now.`;}
+  }
+  body.innerHTML=`<div class="rope" aria-hidden="true"><div class="rope-line"></div><div class="rope-knot" style="left:${pos}%"></div></div><div class="rope-ends"><span class="s">Spoiler</span><span class="d">Duplicator</span></div><p class="oracle-text">${txt}</p>`;
+}
+
+/* ---- turn bar ---- */
+function renderTurn(){
+  const tb=$('#turnbar');const g=S.game;
+  if(S.editing){
+    tb.innerHTML=`<div class="turn-text"><div class="turn-title">Drawing the graphs</div><div class="turn-sub">${editHelp()}</div></div><div class="turn-actions"><button class="btn primary" id="doneEdit">Done, play</button></div>`;
+    $('#doneEdit').onclick=()=>setEditing(false);return;
+  }
+  let av,title,sub,cls;
+  const cpu=who=>S.players[who]==='cpu';
+  if(g.phase==='over'){
+    const sw=g.result.winner==='spoiler';av=sw?AV.s:AV.d;cls=sw?'s':'d';
+    title=sw?'Spoiler wins':'Duplicator wins';
+    sub='';
+  }else if(g.phase==='spoiler'){
+    av=AV.s;cls='s';title=cpu('spoiler')?'Spoiler is choosing…':"Spoiler's move";
+    if(S.mode==='ef')sub=cpu('spoiler')?'The computer is choosing a graph and a vertex.':`Choose graph A or B, then pick a vertex in it. It becomes ${XS(g.picks.length)} if in A, or ${YS(g.picks.length)} if in B.`;
+    else{const p=g.pebbles[S.selPeb];sub=cpu('spoiler')?'The computer is moving a pebble.':`Place the ${pebDot(S.selPeb)} ${PEB[S.selPeb].name} pebble on any vertex in A or B${p?' (it moves from where it is now)':''}. Drag it, or click a vertex.`;}
+  }else{
+    const mv=g.pending;av=AV.d;cls='d';title=cpu('dup')?'Duplicator is answering…':"Duplicator's answer";
+    sub=S.mode==='ef'?`Spoiler picked ${mv.side==='A'?XS(g.picks.length):YS(g.picks.length)} = ${mv.el+1} in ${mv.side}. Pick ${mv.side==='A'?YS(g.picks.length):XS(g.picks.length)} in ${other(mv.side)}.`:`Spoiler put the ${pebDot(mv.peb)} pebble on ${elName(mv.side,mv.el)}. Place its twin in ${other(mv.side)}.`;
+    if(cpu('dup'))sub=`Spoiler picked ${elName(mv.side,mv.el)}. The computer is choosing a partner in ${other(mv.side)}.`;
+  }
+  let tracker;
+  if(S.mode==='ef'){
+    const done=g.picks.length;let dots='';for(let i=0;i<S.k;i++){const lost=g.result&&g.result.winner==='spoiler'&&i===done-1;dots+=`<span class="dot ${lost?'lost':i<done?'done':i===done&&g.phase!=='over'?'now':''}"></span>`;}
+    tracker=`<div class="tracker"><span>Round ${Math.min(done+(g.phase==='over'?0:1),S.k)} of ${S.k}</span><span class="dots">${dots}</span></div>`;
+  }else tracker=`<div class="tracker"><span>Move ${Math.min(g.moves+(g.phase==='over'?0:1),S.limit)} of ${S.limit}</span></div>`;
+  const canHint=g.phase!=='over'&&S.players[g.phase==='spoiler'?'spoiler':'dup']==='human';
+  tb.innerHTML=`<div class="turn-text"><div class="turn-title ${cls}">${title}</div><div class="turn-sub">${sub}</div>${S.hint&&S.hint.text?`<div class="turn-sub" style="color:var(--ink);margin-top:4px">${S.hint.text}</div>`:''}</div>${tracker}<div class="turn-actions"><button class="btn small" id="hintBtn" ${canHint?'':'disabled'}>${bulbIcon()}Hint</button><button class="btn small" id="undoBtn" ${S.history.length?'':'disabled'}>Undo</button><button class="btn small" id="newBtn">Restart</button></div>`;
+  $('#hintBtn').onclick=showHint;$('#undoBtn').onclick=undo;$('#newBtn').onclick=newGame;
+}
+const penIcon=()=>`<svg viewBox="0 0 32 32"><circle cx="16" cy="16" r="16" style="fill:var(--ink)"/><path d="M10 20.5V23h2.5l8.2-8.2-2.5-2.5zM22.6 12.9a1 1 0 000-1.4l-1.1-1.1a1 1 0 00-1.4 0l-.9.9 2.5 2.5z" style="fill:var(--card)"/></svg>`;
+const bulbIcon=()=>`<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5a4.5 4.5 0 00-2.6 8.2c.4.3.6.7.6 1.2v.6h4v-.6c0-.5.2-.9.6-1.2A4.5 4.5 0 008 1.5zM6 13h4v1.5H6z" fill="currentColor"/></svg>`;
+function editHelp(){return 'Click to add a vertex. Drag one vertex onto another to join or unjoin them, or onto empty space to move it. Double-click a vertex, or click an edge, to remove it.';}
+
+/* ---- pebble tray ---- */
+function renderTray(){
+  const tr=$('#tray');
+  if(S.mode!=='pebble'||S.editing){tr.hidden=true;return;}
+  tr.hidden=false;const g=S.game;
+  let h=`<span class="tray-label">Pebble pairs</span>`;
+  for(let i=0;i<S.k;i++){
+    const p=g.pebbles[i];const due=g.phase==='dup'&&g.pending.peb===i;
+    const where=due?`Twin goes in ${other(g.pending.side)}`:p?`on ${elName('A',p.a)} and ${elName('B',p.b)}`:'in hand';
+    const sel=g.phase==='spoiler'&&S.selPeb===i;
+    const hinted=S.hint&&S.hint.peb===i&&g.phase==='spoiler';
+    h+=`<button class="pp ${sel?'sel':''} ${due?'due':''} ${hinted?'hinted':''}" data-tray="${i}" style="--c:${PEB[i].c}" aria-pressed="${sel}"><span class="twins"><span class="tw">${i+1}</span><span class="tw">${i+1}</span></span><span class="pp-t"><b>${PEB[i].name[0].toUpperCase()+PEB[i].name.slice(1)}</b><span>${where}</span></span></button>`;
+  }
+  tr.innerHTML=h;
+}
+
+/* ---- move log ---- */
+function renderLog(){
+  const lg=$('#log');const g=S.game;
+  $('#logWrap').hidden=S.editing||!g.log.length;
+  if(S.editing||!g.log.length){lg.innerHTML='';return;}
+  lg.innerHTML=g.log.map((m,i)=>{
+    let slip='';
+    if(S.showOracle){
+      const an=Oracle.get(m.spKey),dn=Oracle.get(m.dKey);
+      if(an&&dn){
+        const was=spoilerWinsFrom(an,m.rem);const saves=dn.responses.filter(r=>respSaves(r,m.rem));
+        const chosen=dn.responses.find(r=>r.el===m.resp);
+        if(was&&saves.length)slip=`<span class="slip" title="Spoiler was winning, but this move let Duplicator escape.">Spoiler slip</span>`;
+        else if(!was&&saves.length&&chosen&&!respSaves(chosen,m.rem))slip=`<span class="slip" title="Duplicator could have survived, but this answer loses.">Duplicator slip</span>`;
+      }
+    }
+    const last=i===g.log.length-1&&g.result&&g.result.winner==='spoiler';
+    const n=S.mode==='ef'?i:m.peb;
+    const head=S.mode==='ef'?`<span class="mv-n">${i+1}</span>`:`<span class="pd" style="--c:${PEB[m.peb].c}"></span>`;
+    const ca=m.side==='A'?'mv-s':'mv-d',cb=m.side==='B'?'mv-s':'mv-d';
+    return `<li class="mv ${last?'end':''}" data-log="${i}">${head}<span class="${ca}">${XS(n)} = ${m.a+1}</span><span aria-hidden="true">↦</span><span class="${cb}">${YS(n)} = ${m.b+1}</span>${slip}</li>`;
+  }).join('');
+}
+function renderLegend(){
+  const lg=$('#legend');
+  if(S.editing){lg.innerHTML='';return;}
+  lg.innerHTML=`<span><i style="background:var(--spoiler)"></i>chosen by Spoiler</span><span><i style="background:var(--dup)"></i>chosen by Duplicator</span>`;
+}
+
+/* ---- result ---- */
+const XS=i=>`<i>x</i><sub>${i+1}</sub>`,YS=i=>`<i>y</i><sub>${i+1}</sub>`;
+function describeViolation(v){
+  const i=v.i,j=v.j;const P=(side,a)=>side==='A'?XS(a):YS(a);
+  let t;
+  if(v.type==='eq')t=`${P(v.same,i)} = ${P(v.same,j)} in ${v.same}, but ${P(other(v.same),i)} ≠ ${P(other(v.same),j)} in ${other(v.same)}.`;
+  else if(S.kind==='order')t=`${P(v.has,i)} &lt; ${P(v.has,j)} in ${v.has}, but ${P(other(v.has),i)} &gt; ${P(other(v.has),j)} in ${other(v.has)}.`;
+  else if(S.kind==='digraph')t=`There is an arrow from ${P(v.has,i)} to ${P(v.has,j)} in ${v.has}, but none from ${P(other(v.has),i)} to ${P(other(v.has),j)} in ${other(v.has)}.`;
+  else t=`${P(v.has,i)} and ${P(v.has,j)} are adjacent in ${v.has}, but ${P(other(v.has),i)} and ${P(other(v.has),j)} are not adjacent in ${other(v.has)}.`;
+  return t+` So the map <i>f</i>(<i>x</i><sub>i</sub>) = <i>y</i><sub>i</sub> is no longer a partial isomorphism, and no later ${S.mode==='ef'?'round':'move'} can repair it.`;
+}
+function renderResult(){
+  const box=$('#result');const g=S.game;
+  if(S.editing||!g||g.phase!=='over'){box.hidden=true;return;}
+  box.hidden=false;
+  const sw=g.result.winner==='spoiler';box.classList.toggle('sw',sw);box.classList.toggle('dw',!sw);
+  box.innerHTML=`<h3>${sw?'Spoiler':'Duplicator'} wins</h3>`;
+}
+
+/* =====================================================================
+   Board (SVG)
+   ===================================================================== */
+const svg=$('#board'),boardWrap=$('#boardWrap');
+let L=null;
+function layout(){
+  const W=Math.max(280,boardWrap.clientWidth);const stacked=W<640;
+  let A,B,H;
+  const top=30;
+  if(!stacked){const gap=40,w=(W-gap)/2,h=Math.round(Math.max(300,Math.min(470,w*.92)));A={x:0,y:top,w,h};B={x:w+gap,y:top,w,h};H=h+top;}
+  else{const gap=20,h=Math.round(Math.max(250,Math.min(380,W*.78)));A={x:0,y:top,w:W,h};B={x:0,y:2*top+h+gap,w:W,h};H=2*h+gap+2*top;}
+  return {W,H,stacked,rect:{A,B}};
+}
+function nodeR(side){if(S.kind!=='order')return 17;const n=M[side].n;const r=L.rect[side];return n<2?17:Math.max(9,Math.min(17,(r.w-96)/(n-1)/2.6));}
+function nodePos(side,i){
+  const r=L.rect[side],w=S.worlds[side];
+  if(S.kind==='order'){const n=w.nodes.length,px=48;return {x:n===1?r.x+r.w/2:r.x+px+(r.w-2*px)*i/(n-1),y:r.y+r.h*.58};}
+  const nd=w.nodes[i],pad=34,top=62;return {x:r.x+pad+nd.x*(r.w-2*pad),y:r.y+top+nd.y*(r.h-top-pad)};
+}
+function toNorm(side,pt){const r=L.rect[side],pad=34,top=62;return {x:Math.min(1,Math.max(0,(pt.x-r.x-pad)/(r.w-2*pad))),y:Math.min(1,Math.max(0,(pt.y-r.y-top)/(r.h-top-pad)))};}
+function shorten(p,q,r1,r2){const dx=q.x-p.x,dy=q.y-p.y,d=Math.hypot(dx,dy)||1;return [{x:p.x+dx/d*r1,y:p.y+dy/d*r1},{x:q.x-dx/d*r2,y:q.y-dy/d*r2}];}
+function edgePath(side,i,j,cls,marker){
+  const p=nodePos(side,i),q=nodePos(side,j),R=nodeR(side);
+  if(S.kind==='digraph'){
+    const both=hasE(side,j,i)&&i!==j;const [a,b]=shorten(p,q,R+1,R+4);
+    let d;if(both){const mx=(a.x+b.x)/2,my=(a.y+b.y)/2,dx=b.x-a.x,dy=b.y-a.y,len=Math.hypot(dx,dy)||1,off=14;d=`M${a.x},${a.y} Q${mx-dy/len*off},${my+dx/len*off} ${b.x},${b.y}`;}
+    else d=`M${a.x},${a.y} L${b.x},${b.y}`;
+    return `<path class="${cls} directed" d="${d}" marker-end="url(#${marker||'arr'})"/>`;
+  }
+  return `<path class="${cls}" d="M${p.x},${p.y} L${q.x},${q.y}"/>`;
+}
+function threadD(pa,pb){
+  if(!L.stacked){const dx=pb.x-pa.x;return {d:`M${pa.x},${pa.y} C${pa.x+dx*.45},${pa.y} ${pb.x-dx*.45},${pb.y} ${pb.x},${pb.y}`,mid:{x:(pa.x+pb.x)/2,y:(pa.y+pb.y)/2}};}
+  const dy=pb.y-pa.y;return {d:`M${pa.x},${pa.y} C${pa.x},${pa.y+dy*.45} ${pb.x},${pb.y-dy*.45} ${pb.x},${pb.y}`,mid:{x:(pa.x+pb.x)/2,y:(pa.y+pb.y)/2}};
+}
+function chipSVG(x,y,txt,cls){const w=txt.length*6.6+20;return `<g class="chip ${cls}" transform="translate(${x-w},${y})"><rect width="${w}" height="22" rx="9"/><text x="${w/2}" y="15" text-anchor="middle">${esc(txt)}</text></g>`;}
+function renderBoard(){
+  L=layout();
+  svg.setAttribute('viewBox',`0 0 ${L.W} ${L.H}`);svg.style.height=L.H+'px';
+  svg.classList.toggle('editing',S.editing);
+  const g=S.game,F=S.F;
+  let h=`<defs><marker id="arr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="arrowhead"/></marker><marker id="arrBad" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="arrowhead bad"/></marker><marker id="arrFaint" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" class="arrowhead faint"/></marker><pattern id="gdots" width="20" height="20" patternUnits="userSpaceOnUse"><circle cx="2" cy="2" r="1.2" class="gdot"/></pattern></defs>`;
+  const pending=g&&g.phase==='dup'&&!S.editing?g.pending:null;
+  /* worlds */
+  for(const side of SIDES){
+    const r=L.rect[side];
+    let wc='world';if(S.editing)wc+=' editing';if(pending&&side===other(pending.side))wc+=' target';
+    h+=`<rect class="${wc}" data-world="${side}" x="${r.x+.5}" y="${r.y+.5}" width="${r.w-1}" height="${r.h-1}" rx="18"/>`;
+    if(S.editing)h+=`<rect x="${r.x}" y="${r.y}" width="${r.w}" height="${r.h}" rx="18" fill="url(#gdots)" pointer-events="none"/>`;
+    h+=`<text class="wl" x="${r.x+18}" y="${r.y+40}">${side}</text>`;
+    if(F.ok)h+=`<text class="tvl ${F.truth[side]?'yes':'no'}" x="${r.x+r.w-6}" y="${r.y-9}"><title>φ is ${F.truth[side]?'true':'false'} in ${side}</title>${side} ${F.truth[side]?'⊨':'⊭'} φ</text>`;
+    if(S.editing)h+=`<g class="chip no clearchip" data-clear="${side}" role="button" aria-label="Clear graph ${side}" transform="translate(${r.x+r.w-68},${r.y+20})"><rect width="54" height="22" rx="9"/><text x="27" y="15" text-anchor="middle">Clear</text></g>`;  }
+  if(!L.stacked)h+=`<line class="seam" x1="${L.W/2}" y1="20" x2="${L.W/2}" y2="${L.H-20}"/>`;
+  /* edges */
+  for(const side of SIDES){
+    const w=S.worlds[side],n=w.nodes.length;
+    if(S.kind==='order'){
+      if(n>0){const p0=nodePos(side,0),p1=nodePos(side,n-1),r=L.rect[side];
+        h+=`<line class="baseline" x1="${Math.min(p0.x,r.x+40)}" y1="${p0.y}" x2="${Math.max(p1.x,r.x+r.w-30)}" y2="${p1.y}" marker-end="url(#arrFaint)"/>`;
+        h+=`<text class="basecap" x="${r.x+18}" y="${r.y+r.h-16}">smaller → larger</text>`;}
+      continue;
+    }
+    for(const [i,j] of w.edges){
+      h+=`<g data-edge="${side}:${i}:${j}">`;
+      if(S.editing){const p=nodePos(side,i),q=nodePos(side,j);h+=`<path class="edge-hit" d="M${p.x},${p.y} L${q.x},${q.y}"/>`;}
+      h+=edgePath(side,i,j,'edge')+`</g>`;
+    }
+  }
+  /* violation */
+  if(g&&g.phase==='over'&&g.result.winner==='spoiler'&&!S.editing)h+=violationSVG(g.result.v);
+  /* threads */
+  const pairs=g&&!S.editing?currentPairs():[];
+  const freshOn=g&&Date.now()-g.fresh<700;
+  const lastLab=g&&g.log.length?(S.mode==='ef'?g.picks.length-1:g.log[g.log.length-1].peb):-1;
+  const hovLab=S.hoverLog>=0&&g&&g.log[S.hoverLog]?(S.mode==='ef'?S.hoverLog:g.log[S.hoverLog].peb):-2;
+  for(const p of pairs){
+    const pa=nodePos('A',p.a),pb=nodePos('B',p.b);const {d,mid}=threadD(pa,pb);
+    const c=S.mode==='ef'?'var(--faint)':PEB[p.lab].c;
+    const bad=g.phase==='over'&&g.result.v&&(g.result.v.i===p.lab||g.result.v.j===p.lab);
+    h+=`<path class="thread ${freshOn&&p.lab===lastLab?'fresh':''} ${bad?'bad':''} ${hovLab===p.lab?'hov':''}" style="--c:${c}" d="${d}"/>`;
+    if(S.mode==='ef'&&!L.stacked)h+=`<g class="tmid" style="--c:${bad?'var(--bad)':'var(--faint)'}" transform="translate(${mid.x},${mid.y})"><circle r="10"/><text dy="4">${p.lab+1}</text></g>`;
+  }
+  h+=`<path id="rubber" d=""/><line id="linkline" x1="0" y1="0" x2="0" y2="0" style="display:none"/><circle id="ghostnode" r="17" style="display:none"/>`;
+  /* nodes */
+  const hintSet=new Set((S.hint&&S.hint.nodes||[]).map(n=>n.side+n.el));
+  const hovNodes=new Set();if(hovLab>=0){const m=g.log[S.hoverLog];hovNodes.add('A'+m.a);hovNodes.add('B'+m.b);}
+  const badNodes=new Set();if(g&&g.phase==='over'&&g.result.v&&!S.editing){const v=g.result.v;for(const p of [v.pi,v.pj]){badNodes.add('A'+p.a);badNodes.add('B'+p.b);}}
+  const humanS=g&&g.phase==='spoiler'&&S.players.spoiler==='human',humanD=g&&g.phase==='dup'&&S.players.dup==='human';
+  for(const side of SIDES){
+    const n=S.worlds[side].nodes.length,R=nodeR(side);
+    for(let i=0;i<n;i++){
+      const p=nodePos(side,i);let cls='node';
+      if(S.editing)cls+=' edit';
+      else{
+        if(humanS)cls+=' can can-s';
+        if(humanD&&side===other(pending.side))cls+=' can can-d';
+        if(pending&&side===pending.side&&i!==pending.el)cls+=' dim';
+        if(pending&&side===pending.side&&i===pending.el)cls+=' pend';
+        if(badNodes.has(side+i))cls+=' bad';
+        if(hovNodes.has(side+i))cls+=' focus';
+      }
+      h+=`<g class="${cls}" data-node="${side}:${i}" transform="translate(${p.x},${p.y})"><circle class="halo" r="${R+8}"/><circle class="bd" r="${R}"/>${R>=12?`<text dy="4.5">${i+1}</text>`:''}`;
+      if(hintSet.has(side+i))h+=`<circle class="hint-ring ${S.hint.who}" r="${R+6}"/>`;
+      h+=`</g>`;
+    }
+  }
+  /* tokens: badges (EF) or pebbles */
+  if(g&&!S.editing){
+    const tok={};const add=(side,el,item)=>{(tok[side+':'+el]=tok[side+':'+el]||[]).push(item);};
+    if(S.mode==='ef'){
+      g.picks.forEach((p,i)=>{add('A',p.a,{lab:i,who:p.side==='A'?'s':'d'});add('B',p.b,{lab:i,who:p.side==='B'?'s':'d'});});
+      if(pending)add(pending.side,pending.el,{lab:g.picks.length,who:'s',pending:true});
+    }else{
+      g.pebbles.forEach((p,i)=>{if(!p)return;add('A',p.a,{lab:i,who:p.side==='A'?'s':'d',peb:true});add('B',p.b,{lab:i,who:p.side==='B'?'s':'d',peb:true});});
+      if(pending)add(pending.side,pending.el,{lab:pending.peb,who:'s',peb:true,pending:true});
+    }
+    for(const key in tok){
+      const [side,el]=key.split(':');const p=nodePos(side,+el),R=nodeR(side);
+      tok[key].forEach((t,k)=>{
+        const ang=(-58+k*40)*Math.PI/180,dist=R+8;const x=p.x+Math.cos(ang)*dist,y=p.y+Math.sin(ang)*dist;
+        if(t.peb){
+          const grab=humanS&&!t.pending;
+          h+=`<g transform="translate(${x},${y})"><g class="tok ${t.who} ${t.pending?'pending':''} ${grab?'grab':''}" ${grab?`data-peb="${t.lab}"`:''}><circle r="9.5" style="fill:${PEB[t.lab].c}"/><circle class="ring" r="12"/><text dy="3.8">${t.lab+1}</text></g></g>`;
+        }else h+=`<g transform="translate(${x},${y})"><g class="tok badge ${t.who} ${t.pending?'pending':''}"><circle class="fillc" r="9"/><text dy="3.8">${t.lab+1}</text></g></g>`;
+      });
+    }
+  }
+  svg.innerHTML=h;
+}
+function violationSVG(v){
+  let h='';const a1=v.pi.a,a2=v.pj.a,b1=v.pi.b,b2=v.pj.b;
+  const tag=(x,y,t)=>{const w=t.length*6.2+14;return `<g class="vio-tag" transform="translate(${x-w/2},${y-24})"><rect width="${w}" height="18" rx="7"/><text x="${w/2}" y="13">${esc(t)}</text></g>`;};
+  const mid=(side,i,j)=>{const p=nodePos(side,i),q=nodePos(side,j);return {x:(p.x+q.x)/2,y:(p.y+q.y)/2};};
+  if(v.type==='eq'){
+    const diff=other(v.same);const [i,j]=diff==='A'?[a1,a2]:[b1,b2];
+    const p=nodePos(diff,i),q=nodePos(diff,j);h+=`<path class="vio ghost" d="M${p.x},${p.y} L${q.x},${q.y}"/>`;
+    const m=mid(diff,i,j);h+=tag(m.x,m.y,'should be one vertex');
+    const s=nodePos(v.same,v.same==='A'?a1:b1);h+=tag(s.x,s.y-12,'same vertex');
+    return h;
+  }
+  const has=v.has,not=other(v.has);
+  const [hi,hj]=has==='A'?[a1,a2]:[b1,b2],[ni,nj]=not==='A'?[a1,a2]:[b1,b2];
+  if(S.kind==='order'){
+    for(const side of SIDES){const [i,j]=side==='A'?[a1,a2]:[b1,b2];const p=nodePos(side,i),q=nodePos(side,j),R=nodeR(side);
+      const lift=34+Math.abs(q.x-p.x)*.12;h+=`<path class="vio" d="M${p.x},${p.y-R-2} Q${(p.x+q.x)/2},${p.y-R-lift} ${q.x},${q.y-R-2}" marker-end="url(#arrBad)"/>`;}
+    const m1=mid(has,hi,hj),m2=mid(not,ni,nj);h+=tag(m1.x,m1.y-50,'comes before');h+=tag(m2.x,m2.y-50,'comes after');
+    return h;
+  }
+  h+=edgePath(has,hi,hj,'vio','arrBad');
+  if(S.kind==='digraph'){const p=nodePos(not,ni),q=nodePos(not,nj),R=nodeR(not);const [a,b]=shorten(p,q,R+1,R+4);h+=`<path class="vio ghost" d="M${a.x},${a.y} L${b.x},${b.y}" marker-end="url(#arrBad)"/>`;}
+  else{const p=nodePos(not,ni),q=nodePos(not,nj);h+=`<path class="vio ghost" d="M${p.x},${p.y} L${q.x},${q.y}"/>`;}
+  const m1=mid(has,hi,hj),m2=mid(not,ni,nj);
+  h+=tag(m1.x,m1.y,S.kind==='digraph'?'arrow':'adjacent');h+=tag(m2.x,m2.y,S.kind==='digraph'?'no arrow':'not adjacent');
+  return h;
+}
+
+/* ---- pointer input on the board ---- */
+function svgPt(e){const r=svg.getBoundingClientRect();const s=L.W/r.width;return {x:(e.clientX-r.left)*s,y:(e.clientY-r.top)*s};}
+function worldAt(pt){for(const side of SIDES){const r=L.rect[side];if(pt.x>=r.x&&pt.x<=r.x+r.w&&pt.y>=r.y&&pt.y<=r.y+r.h)return side;}return null;}
+function nodeAt(pt){let best=null,bd=1e9;for(const side of SIDES){const R=nodeR(side);for(let i=0;i<S.worlds[side].nodes.length;i++){const p=nodePos(side,i),d=Math.hypot(p.x-pt.x,p.y-pt.y);if(d<R+10&&d<bd){bd=d;best={side,i};}}}return best;}
+let drag=null;
+svg.addEventListener('pointerdown',e=>{
+  if(e.button>0)return;
+  const pt=svgPt(e);
+  const nEl=e.target.closest('[data-node]'),eEl=e.target.closest('[data-edge]'),pEl=e.target.closest('[data-peb]');
+  if(S.editing){
+    const clr=e.target.closest('[data-clear]');
+    if(clr){const side=clr.dataset.clear;S.worlds[side]={name:'Drawn by you',nodes:[{x:.5,y:.5}],edges:[]};markEdited(side);renderAll();return;}
+    const node=nEl?{side:nEl.dataset.node[0],i:+nEl.dataset.node.split(':')[1]}:null;
+    if(node){drag={type:'edit',side:node.side,i:node.i,start:pt,moved:false};svg.setPointerCapture(e.pointerId);e.preventDefault();return;}
+    if(eEl){const [side,i,j]=eEl.dataset.edge.split(':');toggleEdge(side,+i,+j);return;}
+    const side=worldAt(pt);if(side){S.lastAdd=Date.now();addNode(side,pt);}
+    return;
+  }
+  if(pEl){startPebDrag(+pEl.dataset.peb,e,'board');return;}
+  if(nEl)drag={type:'click',node:nEl.dataset.node,start:pt};
+});
+svg.addEventListener('pointermove',e=>{
+  const pt=svgPt(e);
+  if(drag&&drag.type==='edit'){
+    if(Math.hypot(pt.x-drag.start.x,pt.y-drag.start.y)>6)drag.moved=true;
+    if(!drag.moved)return;
+    const p=nodePos(drag.side,drag.i),t=nodeAt(pt),ll=$('#linkline'),gn=$('#ghostnode');
+    const onNode=t&&t.side===drag.side&&t.i!==drag.i,end=onNode?nodePos(t.side,t.i):pt;
+    ll.style.display='';ll.setAttribute('x1',p.x);ll.setAttribute('y1',p.y);ll.setAttribute('x2',end.x);ll.setAttribute('y2',end.y);
+    const inside=worldAt(pt)===drag.side;gn.style.display=!onNode&&inside?'':'none';gn.setAttribute('cx',pt.x);gn.setAttribute('cy',pt.y);
+    return;
+  }
+  updateRubber(pt);
+});
+svg.addEventListener('pointerleave',()=>updateRubber(null));
+svg.addEventListener('dblclick',e=>{
+  if(!S.editing||Date.now()-(S.lastAdd||0)<600)return;
+  const nEl=e.target.closest('[data-node]');if(!nEl)return;
+  const [side,i]=nEl.dataset.node.split(':');removeNode(side,+i);
+});
+svg.addEventListener('pointerup',e=>{
+  const pt=svgPt(e);const d=drag;drag=null;if(!d)return;
+  if(d.type==='edit'){
+    if(!d.moved){renderBoard();return;}
+    const t=nodeAt(pt);
+    if(t&&t.side===d.side&&t.i!==d.i){toggleEdge(d.side,d.i,t.i);return;}
+    if(worldAt(pt)===d.side){const nd=toNorm(d.side,pt);S.worlds[d.side].nodes[d.i]={x:nd.x,y:nd.y};S.customSide[d.side]=true;renderAll();return;}
+    renderBoard();return;
+  }
+  if(d.type==='click'&&Math.hypot(pt.x-d.start.x,pt.y-d.start.y)<10){const [side,i]=d.node.split(':');onNodeClick(side,+i);}
+});
+function updateRubber(pt){
+  const rb=$('#rubber');if(!rb)return;const g=S.game;
+  if(!g||g.phase!=='dup'||S.editing||!pt||S.players.dup!=='human'){rb.setAttribute('d','');return;}
+  const mv=g.pending,tgt=other(mv.side);
+  if(worldAt(pt)!==tgt){rb.setAttribute('d','');return;}
+  const hit=nodeAt(pt);const end=hit&&hit.side===tgt?nodePos(tgt,hit.i):pt;
+  const start=nodePos(mv.side,mv.el);
+  const {d}=mv.side==='A'?threadD(start,end):threadD(end,start);rb.setAttribute('d',d);
+}
+function onNodeClick(side,i){
+  const g=S.game;if(!g)return;
+  if(g.phase==='over'){toast('The game is over. Restart to play again.');return;}
+  if(g.phase==='spoiler'){if(S.players.spoiler!=='human'){toast("It's the computer's turn.");return;}spoilerMove(side,i);return;}
+  if(S.players.dup!=='human'){toast("It's the computer's turn.");return;}
+  if(side===g.pending.side){toast(`Duplicator answers in the other graph, ${other(side)}.`);return;}
+  dupMove(i);
+}
+/* pebble drag (tray or board) */
+function startPebDrag(i,e,from){
+  const g=S.game;if(!g||S.editing)return;
+  const canS=g.phase==='spoiler'&&S.players.spoiler==='human';
+  const canD=g.phase==='dup'&&S.players.dup==='human'&&g.pending.peb===i;
+  if(!canS&&!canD)return;
+  e.preventDefault();
+  const sx=e.clientX,sy=e.clientY;let ghost=null;
+  const move=ev=>{
+    if(!ghost&&Math.hypot(ev.clientX-sx,ev.clientY-sy)>6){ghost=document.createElement('div');ghost.className='ghostpeb';ghost.style.setProperty('--c',PEB[i].c);ghost.textContent=i+1;document.body.appendChild(ghost);}
+    if(ghost){ghost.style.left=ev.clientX+'px';ghost.style.top=ev.clientY+'px';updateRubber(svgPt(ev));}
+  };
+  const up=ev=>{
+    window.removeEventListener('pointermove',move);window.removeEventListener('pointerup',up);
+    if(ghost){ghost.remove();const t=nodeAt(svgPt(ev));
+      if(!t)return;
+      if(canS){S.selPeb=i;spoilerMove(t.side,t.i,i);}
+      else if(t.side===other(g.pending.side))dupMove(t.i);else toast(`The twin goes in the other graph, ${other(g.pending.side)}.`);
+    }else if(canS&&from==='tray'){S.selPeb=i;S.hint=S.hint&&S.hint.peb===i?S.hint:null;renderPanels();}
+  };
+  window.addEventListener('pointermove',move);window.addEventListener('pointerup',up);
+}
+$('#tray').addEventListener('pointerdown',e=>{const b=e.target.closest('[data-tray]');if(b)startPebDrag(+b.dataset.tray,e,'tray');});
+svg.addEventListener('mouseover',()=>{});
+$('#log').addEventListener('pointerover',e=>{const li=e.target.closest('[data-log]');const v=li?+li.dataset.log:-1;if(v!==S.hoverLog){S.hoverLog=v;renderBoard();}});
+$('#log').addEventListener('pointerleave',()=>{if(S.hoverLog!==-1){S.hoverLog=-1;renderBoard();}});
+
+/* =====================================================================
+   Editing worlds
+   ===================================================================== */
+function setEditing(on){
+  S.editing=on;S.linkSrc=null;S.hint=null;
+  if(on){clearTimeout(S.cpuT);renderEditTools();renderAll();return;}
+  $('#editTools').hidden=true;
+  worldsUpdated();
+}
+function renderEditTools(){$('#editTools').hidden=true;}
+function changeKind(k){
+  const was=S.kind;if(k===was)return;
+  for(const side of SIDES){const w=S.worlds[side];
+    if(was==='graph'&&k==='digraph'){const e=[];for(const [i,j] of w.edges){e.push([i,j]);e.push([j,i]);}w.edges=e;}
+    if(was==='digraph'&&k==='graph'){const seen=new Set();w.edges=w.edges.filter(([i,j])=>{const key=Math.min(i,j)+','+Math.max(i,j);if(seen.has(key)||i===j)return false;seen.add(key);return true;}).map(([i,j])=>[Math.min(i,j),Math.max(i,j)]);}
+    if(k!=='order'&&was==='order')w.nodes=ring(w.nodes.length);
+  }
+  S.kind=k;markEdited();
+}
+function markEdited(side){for(const sd of side?[side]:SIDES)S.customSide[sd]=true;if(side)S.worlds[side].name='Drawn by you';M={A:toModel(S.worlds.A,S.kind),B:toModel(S.worlds.B,S.kind)};}
+function addNode(side,pt){const w=S.worlds[side];if(w.nodes.length>=MAXN){toast(`Up to ${MAXN} vertices per graph, so the oracle can keep up.`);return;}w.nodes.push(toNorm(side,pt));markEdited(side);renderAll();}
+function removeNode(side,i){const w=S.worlds[side];if(w.nodes.length<=1){toast('A graph needs at least one vertex.');return;}w.nodes.splice(i,1);w.edges=w.edges.filter(([a,b])=>a!==i&&b!==i).map(([a,b])=>[a>i?a-1:a,b>i?b-1:b]);markEdited(side);renderAll();}
+function toggleEdge(side,i,j){
+  const w=S.worlds[side];
+  const same=S.kind==='graph'?(([a,b])=>(a===i&&b===j)||(a===j&&b===i)):(([a,b])=>a===i&&b===j);
+  const k=w.edges.findIndex(same);
+  if(k>=0)w.edges.splice(k,1);else w.edges.push(S.kind==='graph'?[Math.min(i,j),Math.max(i,j)]:[i,j]);
+  markEdited(side);renderAll();
+}
+
+/* =====================================================================
+   Wiring
+   ===================================================================== */
+function worldsUpdated(){
+  M={A:toModel(S.worlds.A,S.kind),B:toModel(S.worlds.B,S.kind)};
+  reanalyse(true);
+}
+function reanalyse(force){
+  const sig=S.mode+'|'+S.kind+'|'+S.text.replace(/\s+/g,'');
+  if(sig!==S.sig||force){
+    S.sig=sig;
+    const F=analyseSentence(S.text,S.mode);
+    if(F.ok)F.truth={A:evalTop(F,M.A),B:evalTop(F,M.B)};
+    S.F=F;
+    if(F.ok&&S.kAuto){const need=S.mode==='ef'?F.rank:F.nvars;S.k=Math.max(1,Math.min(S.mode==='ef'?6:5,need));}
+  }
+  const F=S.F;
+  const gsig=(F.ok?S.sig:'none')+'|'+S.k+'|'+S.limit;
+  if(F.err&&!force&&S.game){renderSentence();renderSetup();renderBoard();return;}
+  if(gsig!==S.lastSig||force||!S.game){S.lastSig=gsig;if(!S.editing)newGame();else renderAll();}
+  else{renderSentence();renderSetup();renderPanels();}
+}
+function setSentence(t){$('#fx').value=t;S.text=t;reanalyse();}
+function setMode(m){
+  if(m===S.mode)return;
+  S.mode=m;S.kAuto=true;S.hint=null;
+  if(!S.dirty){$('#fx').value=S.text=SENT[m];}
+  if(S.editing){S.editing=false;$('#editTools').hidden=true;}
+  reanalyse(true);
+}
+function setGraph(side,fam,n){
+  S.gsel[side]={fam,n};
+  if(S.kind!=='graph')changeKind('graph');
+  S.customSide[side]=false;S.kAuto=true;
+  S.worlds[side]=makeGraph(fam,n);
+  if(S.editing)renderEditTools();
+  worldsUpdated();
+}
+
+const PALETTE=[['∃','∃','there is'],['∀','∀','for every'],['∧',' ∧ ','and'],['∨',' ∨ ','or'],['¬','¬','not'],['→',' → ','implies'],['↔',' ↔ ','exactly when'],['=',' = ','equals'],['≠',' ≠ ','is different from'],['E( , )','E(x,y)','is adjacent to'],['<',' < ','comes before (ordered lines)'],['lfp','[lfp R(x,y) : ](x,y)','fixed point']];
+$('#palette').innerHTML=PALETTE.map(([l,ins,t],i)=>`<button type="button" data-p="${i}" title="${esc(t)}" class="${l.length>2?'wide':''}">${esc(l)}</button>`).join('');
+$('#palette').addEventListener('click',e=>{
+  const b=e.target.closest('[data-p]');if(!b)return;const [,ins]=PALETTE[+b.dataset.p];const fx=$('#fx');
+  const s=fx.selectionStart??fx.value.length,en=fx.selectionEnd??s;fx.value=fx.value.slice(0,s)+ins+fx.value.slice(en);
+  let caret=s+ins.length;if(ins.startsWith('[lfp'))caret=s+ins.indexOf(' ]')+1;
+  fx.focus();fx.setSelectionRange(caret,caret);onInput();
+});
+$('#exList').addEventListener('click',e=>{const b=e.target.closest('[data-f]');if(!b)return;S.dirty=true;setSentence(b.dataset.f);});
+let inT;
+function onInput(){S.text=$('#fx').value;S.dirty=true;clearTimeout(inT);inT=setTimeout(()=>reanalyse(),160);}
+$('#fx').addEventListener('input',onInput);
+$('#fx').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();clearTimeout(inT);reanalyse();}});
+document.querySelectorAll('.mode').forEach(b=>b.addEventListener('click',()=>setMode(b.dataset.mode)));
+$('#gpick').addEventListener('change',e=>{const sel=e.target.closest('select');if(!sel)return;if(sel.value==='custom'){S.customSide[sel.dataset.side]=true;if(!S.editing)setEditing(true);else renderSetup();return;}const side=sel.dataset.side;const min=FAMILIES.find(f=>f[0]===sel.value)[2];setGraph(side,sel.value,Math.max(min,S.gsel[side].n));});
+$('#gpick').addEventListener('click',e=>{const b=e.target.closest('[data-n]');if(!b)return;const [side,d]=b.dataset.n.split(':');const gs=S.gsel[side];setGraph(side,gs.fam,gs.n+ +d);});
+$('#editTools').addEventListener('click',()=>{},true);
+[['#plS','spoiler'],['#plD','dup']].forEach(([id,who])=>$(id).addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;S.players[who]=b.dataset.v;S.hint=null;renderSetup();renderPanels();renderBoard();scheduleCPU();}));
+$('#orToggle').onclick=()=>{S.showOracle=!S.showOracle;renderPanels();};
+new ResizeObserver(()=>{if(L&&Math.abs(boardWrap.clientWidth-L.W)>1)renderBoard();}).observe(boardWrap);
+
+/* rules sheet */
+function rulesHTML(){
+  const ef=S.mode==='ef';
+  return `<button class="btn small sheet-close" id="closeRules">Close</button><h2 id="rulesH">${ef?'The Ehrenfeucht–Fraïssé game':'The pebble game'}</h2>
+  <p>Two graphs, A and B, are made of vertices, some of them adjacent. Spoiler wants to show the graphs are different. Duplicator wants to keep up the illusion that they are the same.</p>
+  <h3>A turn</h3><ol>${ef?
+  `<li>Spoiler picks graph A or graph B.</li><li>Spoiler chooses a vertex from that graph.</li><li>Duplicator answers with a vertex from the <em>other</em> graph.</li><li>Call the vertex chosen in A in round i <i>x</i><sub>i</sub>, and the one in B <i>y</i><sub>i</sub>, whoever chose them. A thread joins them on the board.</li><li>The game lasts a fixed number of rounds.</li>`:
+  `<li>Spoiler has a few pairs of matching pebbles. Each move, Spoiler takes one pair. If it is already on the board, both pebbles are lifted first.</li><li>Spoiler puts one pebble on any vertex, in either graph.</li><li>Duplicator puts its twin on a vertex in the <em>other</em> graph.</li><li>Because pebbles are reused, the game can run as long as Spoiler likes. Here Spoiler gets a move limit.</li>`}</ol>
+  <h3>Who wins</h3><p>${ef?'Let X = {<i>x</i><sub>1</sub>, …, <i>x</i><sub>n</sub>} and Y = {<i>y</i><sub>1</sub>, …, <i>y</i><sub>n</sub>}. Duplicator wins the n-round game if the map <i>f</i>(<i>x</i><sub>i</sub>) = <i>y</i><sub>i</sub> preserves adjacency and equality:':'The pebbles work the same way: pebble i sits on <i>x</i><sub>i</sub> in A and its twin on <i>y</i><sub>i</sub> in B. After every move, the map <i>f</i>(<i>x</i><sub>i</sub>) = <i>y</i><sub>i</sub> over the pebbled vertices must preserve adjacency and equality:'}</p>
+  <ul><li><i>x</i><sub>i</sub> and <i>x</i><sub>j</sub> are adjacent in A exactly when <i>y</i><sub>i</sub> and <i>y</i><sub>j</sub> are adjacent in B (for arrows, an arrow goes from <i>x</i><sub>i</sub> to <i>x</i><sub>j</sub> exactly when one goes from <i>y</i><sub>i</sub> to <i>y</i><sub>j</sub>; for ordered lines, read “adjacent” as “comes before”);</li><li><i>x</i><sub>i</sub> = <i>x</i><sub>j</sub> exactly when <i>y</i><sub>i</sub> = <i>y</i><sub>j</sub>.</li></ul>
+  <p>Such a map is a <em>partial isomorphism</em>${ef?', and when Duplicator can always win the n-round game we write A ~<sub>n</sub> B':''}. Once <i>f</i> breaks it can never be repaired, so the board stops the game and declares Spoiler the winner straight away. If <i>f</i> is still intact ${ef?'after the last round':'at the move limit'}, Duplicator wins.</p>
+  <h3>Why logicians care</h3><p>${ef?
+  'So A ~<sub>k</sub> B exactly when no sentence with depth k (that is, with ∃ and ∀ nested k deep) is true in one graph and false in the other. A sentence that tells the graphs apart is a winning plan for Spoiler, and a Duplicator strategy proves no such sentence exists.':
+  'With k pebble pairs, Duplicator can survive forever exactly when no sentence that reuses only k variable names can tell the graphs apart, even an infinitely long one. Fixed-point sentences (lfp), such as “everything is connected”, can be unrolled that way. So a k-variable lfp sentence that tells the graphs apart means Spoiler wins the k-pebble game.'}</p>
+  <h3>Writing sentences</h3><div class="syn">
+  <code>∃x  exists x</code><span>there is a vertex x</span><code>∀x  forall x</code><span>for every vertex x</span>
+  <code>∧  &amp;  and</code><span>and</span><code>∨  |  or</code><span>or</span><code>¬  ~  not</code><span>not</span>
+  <code>→  -&gt;</code><span>if … then</span><code>↔  &lt;-&gt;</code><span>exactly when</span>
+  <code>x = y   x ≠ y</code><span>same vertex / different vertices</span>
+  <code>E(x,y)</code><span>x is adjacent to y (an arrow from x to y in arrow graphs)</span>
+  <code>x &lt; y</code><span>x comes before y (ordered lines; same as E)</span>
+  <code>[lfp R(x,y) : … ](u,v)</code><span>build R step by step from nothing, then test (u, v). Pebble game only.</span>
+  <code>∃x. …</code><span>a dot after the variable makes ∃ or ∀ reach to the end</span></div>`;
+}
+$('#rulesBtn').onclick=()=>{$('#rulesSheet').innerHTML=rulesHTML();$('#rules').hidden=false;$('#closeRules').onclick=closeRules;$('#closeRules').focus();};
+function closeRules(){$('#rules').hidden=true;$('#rulesBtn').focus();}
+$('#rules').addEventListener('click',e=>{if(e.target.id==='rules')closeRules();});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('#rules').hidden)closeRules();});
+
+/* boot */
+S.worlds={A:makeGraph('cycle',6),B:makeGraph('disc',6)};
+$('#fx').value=S.text=SENT.ef;
+worldsUpdated();
+setEditing(true);
+</script>
+</body>
+</html>
