@@ -1,34 +1,12 @@
-# EF Games Simulator
+I was studying a little bit of FOL and a little bit of Descriptive Complexity, which led me to FOL with Least Fixed Points. Now, to show that a property is definable in FOL is fairly straightforward – we can give the sentence. But, to show that a sentence is *not* definable in FOL seems more challenging. For that, we have Ehrenfeucht-Fraïssé games. Similarly, for showing non-expressibility of a property in FOL with least fixed points, we have pebble games. 
 
-An interactive playground for two game-based proof techniques in finite model theory:
+A resource I liked for 
+1. EF-Games: https://pi.math.cornell.edu/~mec/Summer2009/Raluca/lesson1.html
+2. Pebble Games: https://www.youtube.com/watch?v=IMsxnPnylSw&t=1543s
 
-- **Ehrenfeucht–Fraïssé games** for first-order logic (a fixed number of rounds)
-- **Pebble games** for fixed-point logic, FO(LFP) (a fixed number of pebble pairs)
+The site is live at https://vaanigo.github.io/EF-Games-Simulator/
 
-Write a sentence φ, draw or pick two graphs A and B, and play Spoiler and Duplicator. The rules are enforced automatically: after every round the map f(xᵢ) = yᵢ must preserve adjacency and equality (a partial isomorphism), and the winner is shown as soon as the game is decided.
-
-## Features
-
-- Sentence input with symbols (`∃ ∀ ∧ ∨ ¬ → ↔ = ≠`) or plain words (`exists`, `forall`, `and`, `or`, `not`), plus fixed points written as `[lfp R(x,y) : … ](u,v)`
-- Live truth values: A ⊨ φ / A ⊭ φ for each graph
-- The number of rounds (EF) is the sentence's quantifier depth; the number of pebble pairs is its number of variables
-- Draw your own graphs, or use a cycle of length n, a complete graph on n vertices, or a disconnected graph
-- Hints, undo, and a computer player for either side
-- An optional perfect-play oracle that solves the game exactly for small graphs (up to 10 vertices each)
-
-## Deploying with GitHub Pages
-
-The whole app is a single static file, `index.html`, so there is no build step.
-
-1. On GitHub, open the repository and go to **Settings → Pages**.
-2. Under **Build and deployment**, set **Source** to **Deploy from a branch**.
-3. Choose the **main** branch and the **/ (root)** folder, then click **Save**.
-
-After a minute or so the site is live at:
-
-https://vaanigo.github.io/EF-Games-Simulator/
-
-## Running locally
+## To run locally
 
 Open `index.html` in a browser. To serve it the same way GitHub Pages does:
 
